@@ -100,19 +100,19 @@ class DefaultKeyboardButtons(Enum):
     BonusTransfer = "🧧 Welcome Bonus"
 
     Countries = "🌍 Countries"
-    SendMessageToAll = "📩 👥"
-    SendMessageToOne = "📩 👤"
-    SendMessageToGroup = "📩 👥 🟧"
-    SendMessageToCountry = "📩 👥 🌍"
-    SendMessageToCountryGroup = "📩 👥 🌍 🟧"
-    CreateBonus = "⚙️ 🎁"
-    AllBonuses = "🔍 🎁"
-    AllBonusRequests = "🔍 ALL 💌"
-    ReportsGeneration = "⚙️ 📊"
-    ViewUser = "🔍 👤"
-    ViewUsersPerGroup = "🔍 👥 🟧"
+    SendMessageToAll = "📩 Broadcast All"
+    SendMessageToOne = "📩 Message User"
+    SendMessageToGroup = "📩 Message Group"
+    SendMessageToCountry = "📩 Message Country"
+    SendMessageToCountryGroup = "📩 Message Country+Group"
+    CreateBonus = "🎁 Create Bonus"
+    AllBonuses = "🔍 All Bonuses"
+    AllBonusRequests = "🔍 All Requests"
+    ReportsGeneration = "📊 Reports"
+    ViewUser = "🔍 Find User"
+    ViewUsersPerGroup = "👥 Users by Group"
 
-    Cancel = "‍⬅️ Cancel"
+    Cancel = "⬅️ Cancel"
 
 
 class InlineQueryTypes(Enum):

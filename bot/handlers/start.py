@@ -1,18 +1,24 @@
+import logging
 from asyncio import sleep
 from aiogram import types
+from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.builtin import CommandStart
 from aiogram.types import ChatActions, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 
 from bot.loader import dp, bot
-from bot.keyboards.default import main_menu_keyboard
+from bot.keyboards.default import main_menu_keyboard, manage_keyboard
 from bot.keyboards.inline import message_inline_button_keyboard, select_country_keyboard
+from bot.states import UpdateSiteID
 from common.constants import BuiltInReferralSources, DefaultInlineButtons
-from config import BOT_ADMINS, BONUS_TRANSFER_URL
+from config import BOT_ADMINS, BONUS_TRANSFER_URL, REGISTRATION_URL
 from logics import UserLogics, CountryLogics
 
 
-@dp.message_handler(CommandStart())
-async def process_start(message: types.Message):
+@dp.message_handler(CommandStart(), state="*")
+async def process_start(message: types.Message, state: FSMContext = None):
+    if state:
+        await state.finish()
+
     user = UserLogics.get_by_chat_id(message.from_user.id)
     if not user:
         referral_source = referral_user_id = None
@@ -60,7 +66,20 @@ async def process_start(message: types.Message):
                 )
             return
 
-    # User already has valid country
+    # Check site_id requirement for non-managers
+    if not user.site_id and not user.is_manager:
+        await UpdateSiteID.send_site_id.set()
+        reg_link = f"\n\nDon't have an account yet? Register <a href='{REGISTRATION_URL}'>HERE</a>" if REGISTRATION_URL else ""
+        await message.answer(
+            f"🌍 Country: <b>{user.country.name}</b>\n\n"
+            f"🃏 <b>Please enter your Site ID / Nickname:</b>\n"
+            f"<i>Without Site ID / Nickname, you will not be able to use the bot and request bonuses.</i>"
+            f"{reg_link}",
+            parse_mode="HTML"
+        )
+        return
+
+    # User already has valid country and site_id
     reply_markup = None
     if BONUS_TRANSFER_URL:
         reply_markup = InlineKeyboardMarkup().add(
@@ -70,16 +89,19 @@ async def process_start(message: types.Message):
             )
         )
 
-    await message.answer_photo(
-        photo='https://i.pinimg.com/736x/f9/32/f2/f932f20f8e4f42ccef38af270f323b08.jpg',
-        caption="Start smart. Feel the edge from the very first move.\n\n",
-        parse_mode="HTML",
-        reply_markup=reply_markup
-    )
+    try:
+        await message.answer_photo(
+            photo='https://i.pinimg.com/736x/f9/32/f2/f932f20f8e4f42ccef38af270f323b08.jpg',
+            caption="Start smart. Feel the edge from the very first move.\n\n",
+            parse_mode="HTML",
+            reply_markup=reply_markup
+        )
+    except Exception as e:
+        logging.warning(f"Could not send start photo: {e}")
 
     await message.answer(
         text=f"Welcome back, {user.nickname or 'friend'} 👋!\n🌍 Country: <b>{user.country.name}</b>",
-        reply_markup=main_menu_keyboard(),
+        reply_markup=main_menu_keyboard() if not user.is_manager else manage_keyboard(),
         parse_mode="HTML"
     )
 

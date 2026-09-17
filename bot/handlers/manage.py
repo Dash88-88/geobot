@@ -1,4 +1,5 @@
 import re
+import html
 import logging
 from datetime import datetime, timedelta
 from asyncio import sleep, gather
@@ -91,15 +92,19 @@ from models import User
 regex = r"\((?=[^)]*\d)[\d:]+\)"
 
 
-@dp.message_handler(Command(BotCommands.Manage.value), UserFilter(only_managers=True))
-async def process_manage(message: types.Message):
+@dp.message_handler(Command(BotCommands.Manage.value), UserFilter(only_managers=True), state="*")
+async def process_manage(message: types.Message, state: FSMContext = None):
+    if state:
+        await state.finish()
     await message.answer("🛠️ <b>Admin Management Panel</b>", reply_markup=manage_keyboard(), parse_mode="HTML")
 
 
 # ==================== REPORT GENERATION ====================
 
-@dp.message_handler(Text(DefaultKeyboardButtons.ReportsGeneration.value), UserFilter(only_managers=True))
-async def process_report_generation(message: types.Message):
+@dp.message_handler(Text([DefaultKeyboardButtons.ReportsGeneration.value, "⚙️ 📊", "Отчеты"]), UserFilter(only_managers=True), state="*")
+async def process_report_generation(message: types.Message, state: FSMContext = None):
+    if state:
+        await state.finish()
     bonus_requests_db = BonusRequestLogics.get_list()
     totals_user_data = {
         RequestReportTotalTitles.rejected_bonus_request_total.value:
@@ -185,8 +190,10 @@ async def process_bonus_request_status_filter(call: types.CallbackQuery, callbac
                               reply_markup=select_bonus_request_filter_keyboard(bonus_id=bonus_id))
 
 
-@dp.message_handler(Text(DefaultKeyboardButtons.AllBonusRequests.value), UserFilter(only_managers=True))
-async def process_open_all_bonus_requests(message: types.Message):
+@dp.message_handler(Text([DefaultKeyboardButtons.AllBonusRequests.value, "🔍 ALL 💌"]), UserFilter(only_managers=True), state="*")
+async def process_open_all_bonus_requests(message: types.Message, state: FSMContext = None):
+    if state:
+        await state.finish()
     await message.answer("Select Bonus Request status filter:", reply_markup=select_bonus_request_filter_keyboard())
 
 
@@ -213,7 +220,13 @@ async def send_all_bonus_requests_page(message=None, call=None, bonus_request_st
 
     target = call.message if call else message
     if not all_requests:
-        await target.answer("No bonus requests found 🔍")
+        status_label = f" ({bonus_request_status})" if bonus_request_status else ""
+        await target.answer(
+            f"No bonus requests found{status_label} 🔍\n\n"
+            f"💡 <i>Bonus requests appear here after users click the <b>📲 Request Bonus</b> button.</i>\n"
+            f"To view and manage all created bonuses, press <b>🔍 All Bonuses</b>.",
+            parse_mode="HTML"
+        )
         return
 
     for b_request in all_requests:
@@ -238,12 +251,31 @@ def get_paginated_filtered_bonus_requests(bonus_request_status: str, page: int, 
     return all_requests[start:end], total
 
 
-# ==================== BONUS CREATION WITH COUNTRY ====================
+# ==================== BONUS CREATION ====================
 
-@dp.message_handler(Text(DefaultKeyboardButtons.CreateBonus.value), UserFilter(only_managers=True))
-async def process_create_new_bonus(message: types.Message):
+@dp.message_handler(Command(["create_bonus", "new_bonus", "bonus_create", "add_bonus"]), UserFilter(only_managers=True), state="*")
+@dp.message_handler(
+    Text([
+        DefaultKeyboardButtons.CreateBonus.value,
+        "🎁 Create Bonus",
+        "⚙️ 🎁",
+        "⚙ 🎁",
+        "Create Bonus",
+        "Создать бонус",
+        "+ Create Bonus"
+    ], ignore_case=True),
+    UserFilter(only_managers=True),
+    state="*"
+)
+async def process_create_new_bonus(message: types.Message, state: FSMContext = None):
+    if state:
+        await state.finish()
     await CreateNewBonus.send_bonus_description.set()
-    await message.answer("Enter the new bonus description (<1000 symbols) 👉", reply_markup=cancel_keyboard())
+    await message.answer(
+        "📝 <b>Enter the new bonus description (&lt;1000 symbols) 👉</b>",
+        reply_markup=cancel_keyboard(),
+        parse_mode="HTML"
+    )
 
 
 @dp.message_handler(UserFilter(only_managers=True), state=CreateNewBonus.send_bonus_description, content_types=(ContentType.ANY,))
@@ -265,23 +297,46 @@ async def process_create_new_bonus_description(message: types.Message, state: FS
         await message.answer("The bonus description must be less than 1000 characters. Try again:")
         return
 
-    await state.update_data(description=text)
-    await CreateNewBonus.select_bonus_country.set()
+    await state.finish()
 
-    countries = CountryLogics.get_list(is_removed=False)
-    await message.answer(
-        "🌍 <b>Select target country for this bonus:</b>\n<i>Choose 'All Countries' for a global promo, or select a specific country.</i>",
-        reply_markup=select_bonus_country_keyboard(countries),
-        parse_mode="HTML"
+    bonus = BonusLogics.create(
+        description=text,
+        group=Groups.All.value,
+        country=None,
+        is_request=True
     )
 
+    group_icon = group_display_dict.get(Groups.All.value, ['🟩'])[0]
+    try:
+        await message.answer(
+            f"✅ <b>New bonus created!</b> 🔴 <i>(inactive)</i>\n"
+            f"🌍 Country: <b>🌍 All Countries</b>\n"
+            f"👥 Group: {group_icon} <b>all</b>\n"
+            f"💌 Requests: <b>Enabled</b>\n\n"
+            f"{html.escape(text)}\n\n"
+            f"💡 <i>Enable this bonus with 🟢 ON button below.</i>",
+            reply_markup=view_bonus_keyboard(bonus_id=bonus.id),
+            parse_mode="HTML"
+        )
+    except Exception:
+        await message.answer(
+            f"✅ New bonus created! 🔴 (inactive)\n"
+            f"🌍 Country: All Countries\n"
+            f"👥 Group: {group_icon} all\n"
+            f"💌 Requests: Enabled\n\n"
+            f"{text}\n\n"
+            f"💡 Enable this bonus with 🟢 ON button below.",
+            reply_markup=view_bonus_keyboard(bonus_id=bonus.id)
+        )
 
-@dp.callback_query_handler(select_bonus_create_country_callback.filter(), UserFilter(only_managers=True), state=CreateNewBonus.select_bonus_country)
+
+@dp.callback_query_handler(select_bonus_create_country_callback.filter(), UserFilter(only_managers=True), state="*")
 async def process_create_new_bonus_country(call: types.CallbackQuery, callback_data: dict, state: FSMContext):
     country_id = callback_data.get("country_id")
-    data = await state.get_data()
-    description = data.get("description")
-    await state.finish()
+    data = await state.get_data() if state else {}
+    description = data.get("description", "New Bonus")
+    if state:
+        await state.finish()
 
     target_country = None
     if country_id != "all":
@@ -289,7 +344,7 @@ async def process_create_new_bonus_country(call: types.CallbackQuery, callback_d
 
     bonus = BonusLogics.create(
         description=description,
-        group=Groups.Neutral.value,
+        group=Groups.All.value,
         country=target_country
     )
 
@@ -491,8 +546,10 @@ async def approve_personal_message_handler(call: types.CallbackQuery, state: FSM
 
 # ==================== BROADCAST TO GROUP ====================
 
-@dp.message_handler(Text(DefaultKeyboardButtons.SendMessageToGroup.value), UserFilter(only_managers=True))
-async def process_send_message_to_group(message: types.Message):
+@dp.message_handler(Text([DefaultKeyboardButtons.SendMessageToGroup.value, "📩 👥 🟧"]), UserFilter(only_managers=True), state="*")
+async def process_send_message_to_group(message: types.Message, state: FSMContext = None):
+    if state:
+        await state.finish()
     await message.answer("Select the group to message 👉:", reply_markup=message_group_keyboard())
 
 
@@ -572,8 +629,10 @@ async def approve_group_message_handler(call: types.CallbackQuery, state: FSMCon
 
 # ==================== BROADCAST TO COUNTRY ====================
 
-@dp.message_handler(Text(DefaultKeyboardButtons.SendMessageToCountry.value), UserFilter(only_managers=True))
-async def process_send_message_to_country_start(message: types.Message):
+@dp.message_handler(Text([DefaultKeyboardButtons.SendMessageToCountry.value, "📩 👥 🌍"]), UserFilter(only_managers=True), state="*")
+async def process_send_message_to_country_start(message: types.Message, state: FSMContext = None):
+    if state:
+        await state.finish()
     countries = CountryLogics.get_list(is_removed=False)
     if not countries:
         await message.answer("No countries available. Please create a country first.", reply_markup=manage_keyboard())
@@ -664,8 +723,10 @@ async def approve_country_message_handler(call: types.CallbackQuery, state: FSMC
 
 # ==================== BROADCAST TO COUNTRY + GROUP ====================
 
-@dp.message_handler(Text(DefaultKeyboardButtons.SendMessageToCountryGroup.value), UserFilter(only_managers=True))
-async def process_send_message_to_country_group_start(message: types.Message):
+@dp.message_handler(Text([DefaultKeyboardButtons.SendMessageToCountryGroup.value, "📩 👥 🌍 🟧"]), UserFilter(only_managers=True), state="*")
+async def process_send_message_to_country_group_start(message: types.Message, state: FSMContext = None):
+    if state:
+        await state.finish()
     countries = CountryLogics.get_list(is_removed=False)
     if not countries:
         await message.answer("No countries available. Please create a country first.", reply_markup=manage_keyboard())
@@ -773,8 +834,10 @@ async def approve_country_group_message_handler(call: types.CallbackQuery, state
 
 # ==================== BROADCAST TO ALL ====================
 
-@dp.message_handler(Text(DefaultKeyboardButtons.SendMessageToAll.value), UserFilter(only_managers=True))
-async def process_send_message_to_all(message: types.Message):
+@dp.message_handler(Text([DefaultKeyboardButtons.SendMessageToAll.value, "📩 👥"]), UserFilter(only_managers=True), state="*")
+async def process_send_message_to_all(message: types.Message, state: FSMContext = None):
+    if state:
+        await state.finish()
     await SendMessageToAll.send_message.set()
     await message.answer(
         "The message will be sent to <b>all</b> users ⚠️\n\n"
@@ -843,8 +906,10 @@ async def approve_all_message_handler(call: types.CallbackQuery, state: FSMConte
 
 # ==================== SEND BY CHAT ID ====================
 
-@dp.message_handler(Text(DefaultKeyboardButtons.SendMessageToOne.value), UserFilter(only_managers=True))
-async def process_send_chat_id(message: types.Message):
+@dp.message_handler(Text([DefaultKeyboardButtons.SendMessageToOne.value, "📩 👤"]), UserFilter(only_managers=True), state="*")
+async def process_send_chat_id(message: types.Message, state: FSMContext = None):
+    if state:
+        await state.finish()
     await SendChatID.send_chat_id.set()
     await message.answer("Enter the recipient <b>chat_id</b>:", reply_markup=cancel_keyboard(), parse_mode="HTML")
 

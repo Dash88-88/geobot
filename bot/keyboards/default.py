@@ -29,12 +29,15 @@ def manage_keyboard():
             [
                 KeyboardButton(DefaultKeyboardButtons.ReportsGeneration.value),
                 KeyboardButton(DefaultKeyboardButtons.Countries.value),
-                KeyboardButton(DefaultKeyboardButtons.CreateBonus.value)
+            ],
+            [
+                KeyboardButton(DefaultKeyboardButtons.CreateBonus.value),
+                KeyboardButton(DefaultKeyboardButtons.AllBonuses.value),
+                KeyboardButton(DefaultKeyboardButtons.AllBonusRequests.value)
             ],
             [
                 KeyboardButton(DefaultKeyboardButtons.ViewUser.value),
                 KeyboardButton(DefaultKeyboardButtons.ViewUsersPerGroup.value),
-                KeyboardButton(DefaultKeyboardButtons.AllBonusRequests.value)
             ],
             [
                 KeyboardButton(DefaultKeyboardButtons.SendMessageToOne.value),

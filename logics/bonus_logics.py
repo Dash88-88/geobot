@@ -24,11 +24,13 @@ class BonusLogics:
         return Bonus.select()
 
     @classmethod
-    def create(cls, description: str, group: str, country: Optional[Country] = None) -> Bonus:
+    def create(cls, description: str, group: str = Groups.All.value, country: Optional[Country] = None, is_active: bool = False, is_request: bool = True) -> Bonus:
         bonus = Bonus.create(
             description=description,
             group=group,
-            country=country
+            country=country,
+            is_active=is_active,
+            is_request=is_request
         )
         return bonus
 

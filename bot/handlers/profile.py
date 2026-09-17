@@ -1,8 +1,9 @@
+import logging
 from asyncio import sleep
 from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Text
-from aiogram.types import ContentType
+from aiogram.types import ContentType, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from bot.filters import UserFilter
 from bot.keyboards.callback_datas import (
     open_user_callback,
@@ -46,7 +47,7 @@ from common.exceptions import (
     UserAlreadyPositiveError,
     UserAlreadyVipError,
 )
-from config import COMMUNITY_URL, REGISTRATION_URL, USERS_PER_PAGE
+from config import COMMUNITY_URL, REGISTRATION_URL, USERS_PER_PAGE, BONUS_TRANSFER_URL
 from logics import UserLogics
 from models import User
 from html import escape as html_escape
@@ -82,7 +83,8 @@ async def _send_user_info(message: types.Message, user_id: str):
         parse_mode="HTML",
         reply_markup=user_keyboard(
             opened_user_id=user_id,
-            is_opened_user_blocked=user.is_blocked
+            is_opened_user_blocked=user.is_blocked,
+            current_group=user.group
         )
     )
 
@@ -126,28 +128,36 @@ def get_paginated_users(group, page: int):
     return all_users[start:end], total
 
 
-@dp.message_handler(Text(DefaultKeyboardButtons.ViewUsersPerGroup.value), UserFilter(only_managers=True))
-async def process_view_users_by_group(message: types.Message):
+@dp.message_handler(Text([DefaultKeyboardButtons.ViewUsersPerGroup.value, "🔍 👥 🟧"]), UserFilter(only_managers=True), state="*")
+async def process_view_users_by_group(message: types.Message, state: FSMContext = None):
+    if state:
+        await state.finish()
     await message.answer("Select user group to view first 👉:", reply_markup=open_users_per_group_keyboard())
 
 
-@dp.callback_query_handler(open_users_per_group_callback.filter(), UserFilter(only_managers=True))
-async def confirm_view_users_by_group(call: types.CallbackQuery, callback_data: dict):
+@dp.callback_query_handler(open_users_per_group_callback.filter(), UserFilter(only_managers=True), state="*")
+async def confirm_view_users_by_group(call: types.CallbackQuery, callback_data: dict, state: FSMContext = None):
+    if state:
+        await state.finish()
     group = callback_data.get('group')
     await send_users_page(message=call.message, group=group, page=1)
     await call.answer()
 
 
-@dp.callback_query_handler(users_page_callback.filter(), UserFilter(only_managers=True))
-async def process_users_pagination(call: types.CallbackQuery, callback_data: dict):
+@dp.callback_query_handler(users_page_callback.filter(), UserFilter(only_managers=True), state="*")
+async def process_users_pagination(call: types.CallbackQuery, callback_data: dict, state: FSMContext = None):
+    if state:
+        await state.finish()
     group = callback_data["group"]
     page = int(callback_data["page"])
     await send_users_page(call=call, group=group, page=page)
     await call.answer()
 
 
-@dp.message_handler(Text(DefaultKeyboardButtons.ViewUser.value), UserFilter(only_managers=True))
-async def process_view_user_by_id(message: types.Message):
+@dp.message_handler(Text([DefaultKeyboardButtons.ViewUser.value, "🔍 👤"]), UserFilter(only_managers=True), state="*")
+async def process_view_user_by_id(message: types.Message, state: FSMContext = None):
+    if state:
+        await state.finish()
     await ViewUser.send_chat_id.set()
     await message.answer("Enter user Chat ID, Username (@username) or Site ID / Nickname to view 👉:", reply_markup=cancel_keyboard())
 
@@ -399,15 +409,50 @@ async def process_confirm_update_site_id(message: types.Message, state: FSMConte
         return
 
     user = UserLogics.get_by_chat_id(message.from_user.id)
+    is_new_registration = False
     if user:
+        if not user.site_id:
+            is_new_registration = True
         UserLogics.set_site_id(user, site_id)
 
     await state.finish()
-    await message.answer(
-        f"✅ Your Site ID / Nickname has been updated to: <b>{html_escape(site_id)}</b>",
-        reply_markup=main_menu_keyboard(),
-        parse_mode="HTML"
-    )
+
+    if is_new_registration and not (user and user.is_manager):
+        # Onboarding complete for new user
+        reply_markup = None
+        if BONUS_TRANSFER_URL:
+            reply_markup = InlineKeyboardMarkup().add(
+                InlineKeyboardButton(
+                    text=DefaultInlineButtons.LearMore.value,
+                    web_app=WebAppInfo(url=BONUS_TRANSFER_URL)
+                )
+            )
+
+        try:
+            await message.answer_photo(
+                photo='https://i.pinimg.com/736x/f9/32/f2/f932f20f8e4f42ccef38af270f323b08.jpg',
+                caption="Start smart. Feel the edge from the very first move.\n\n",
+                parse_mode="HTML",
+                reply_markup=reply_markup
+            )
+        except Exception as e:
+            logging.warning(f"Could not send onboarding photo: {e}")
+
+        country_name = user.country.name if user and user.country else "Unknown"
+        await message.answer(
+            f"✅ <b>Registration complete!</b>\n"
+            f"🌍 Country: <b>{country_name}</b>\n"
+            f"🃏 Site ID / Nickname: <b>{html_escape(site_id)}</b>\n\n"
+            f"Welcome, {message.from_user.first_name or user.nickname or 'friend'} 👋!",
+            reply_markup=main_menu_keyboard(),
+            parse_mode="HTML"
+        )
+    else:
+        await message.answer(
+            f"✅ Your Site ID / Nickname has been updated to: <b>{html_escape(site_id)}</b>",
+            reply_markup=main_menu_keyboard() if not (user and user.is_manager) else manage_keyboard(),
+            parse_mode="HTML"
+        )
 
 
 @dp.message_handler(state=UpdateSiteID.send_site_id, content_types=ContentType.ANY)

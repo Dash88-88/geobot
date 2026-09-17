@@ -4,7 +4,7 @@ from asyncio import sleep
 
 from aiogram import types
 from aiogram.dispatcher import FSMContext
-from aiogram.dispatcher.filters import Text
+from aiogram.dispatcher.filters import Text, Command
 from aiogram.types import ContentType
 from bot.filters import UserFilter
 from bot.keyboards.callback_datas import (
@@ -157,8 +157,10 @@ async def _send_bonus_info(user_id: str or int, bonus_id: str, is_requested: boo
 
 
 
-@dp.callback_query_handler(view_bonus_callback.filter(), UserFilter())
-async def process_view_bonus(call: types.CallbackQuery, callback_data: dict):
+@dp.callback_query_handler(view_bonus_callback.filter(), UserFilter(), state="*")
+async def process_view_bonus(call: types.CallbackQuery, callback_data: dict, state: FSMContext = None):
+    if state:
+        await state.finish()
     bonus_id = callback_data.get('bonus_id')
     bonus = BonusLogics.get_by_id(bonus_id)
     if not bonus or bonus.is_removed:
@@ -186,7 +188,10 @@ async def send_bonuses_page(message=None, call=None, user=None, page=1):
 
     target = call.message if call else message
     if not bonuses:
-        await target.answer("Waiting for new bonuses 👓")
+        if user and user.is_manager:
+            await target.answer("No bonuses found in database 🔍\nYou can create one using <b>🎁 Create Bonus</b>.", parse_mode="HTML")
+        else:
+            await target.answer("Waiting for new bonuses 👓")
         return
 
     for bonus in bonuses:
@@ -204,13 +209,28 @@ async def send_bonuses_page(message=None, call=None, user=None, page=1):
     )
 
 
-@dp.message_handler(Text(DefaultKeyboardButtons.Bonuses.value), UserFilter())
-async def process_open_my_bonuses(message: types.Message):
+@dp.message_handler(Command(["bonuses", "all_bonuses"]), UserFilter(), state="*")
+@dp.message_handler(
+    Text([
+        DefaultKeyboardButtons.Bonuses.value,
+        DefaultKeyboardButtons.AllBonuses.value,
+        "🎁 Bonuses",
+        "🔍 All Bonuses",
+        "🔍 🎁",
+        "Бонусы",
+        "Все бонусы"
+    ], ignore_case=True),
+    UserFilter(),
+    state="*"
+)
+async def process_open_my_bonuses(message: types.Message, state: FSMContext = None):
+    if state:
+        await state.finish()
     user = UserLogics.get_by_chat_id(message.from_user.id)
     await send_bonuses_page(message=message, user=user, page=1)
 
 
-@dp.callback_query_handler(bonuses_page_callback.filter())
+@dp.callback_query_handler(bonuses_page_callback.filter(), state="*")
 async def process_bonuses_pagination(call: types.CallbackQuery, callback_data: dict):
     page = int(callback_data["page"])
     user = UserLogics.get_by_chat_id(call.from_user.id)
@@ -218,7 +238,7 @@ async def process_bonuses_pagination(call: types.CallbackQuery, callback_data: d
     await call.answer()
 
 
-@dp.callback_query_handler(change_bonus_group_callback.filter(), UserFilter(only_managers=True))
+@dp.callback_query_handler(change_bonus_group_callback.filter(), UserFilter(only_managers=True), state="*")
 async def process_change_bonus_group_callback(call: types.CallbackQuery, callback_data: dict, state: FSMContext):
     bonus_id = callback_data.get('bonus_id')
     bonus = BonusLogics.get_by_id(bonus_id)
@@ -227,13 +247,19 @@ async def process_change_bonus_group_callback(call: types.CallbackQuery, callbac
         return
 
     await state.update_data(bonus_id=bonus_id)
-    await call.message.answer("Select new group for the bonus:",
-                              reply_markup=change_bonus_group_keyboard(bonus_id=bonus_id, current_group=bonus.group))
+    group_icon = group_display_dict.get(bonus.group, ['🟩'])[0]
+    await call.message.answer(
+        f"Select new group for the bonus (Current: {group_icon} <b>{bonus.group}</b>):",
+        reply_markup=change_bonus_group_keyboard(bonus_id=bonus_id, current_group=bonus.group),
+        parse_mode="HTML"
+    )
     await call.message.delete()
 
 
-@dp.callback_query_handler(change_bonus_group_cancel_callback.filter(), UserFilter(only_managers=True))
-async def process_change_bonus_group_cancel_callback(call: types.CallbackQuery, callback_data: dict):
+@dp.callback_query_handler(change_bonus_group_cancel_callback.filter(), UserFilter(only_managers=True), state="*")
+async def process_change_bonus_group_cancel_callback(call: types.CallbackQuery, callback_data: dict, state: FSMContext = None):
+    if state:
+        await state.finish()
     bonus_id = callback_data.get("bonus_id")
     await call.message.answer("Bonus group was not changed 😌", reply_markup=manage_keyboard())
     await _send_bonus_info(call.from_user.id, bonus_id)
@@ -241,7 +267,7 @@ async def process_change_bonus_group_cancel_callback(call: types.CallbackQuery, 
     await sleep(0.5)
 
 
-@dp.callback_query_handler(enable_bonus_callback.filter(), UserFilter(only_managers=True))
+@dp.callback_query_handler(enable_bonus_callback.filter(), UserFilter(only_managers=True), state="*")
 async def process_enable_bonus(call: types.CallbackQuery, callback_data: dict, state: FSMContext):
     bonus_id = callback_data.get('bonus_id')
     await state.update_data(bonus_id=bonus_id)
@@ -250,8 +276,10 @@ async def process_enable_bonus(call: types.CallbackQuery, callback_data: dict, s
     await call.message.delete()
 
 
-@dp.callback_query_handler(enable_bonus_cancel_callback.filter(), UserFilter(only_managers=True))
-async def process_enable_bonus_cancel(call: types.CallbackQuery, callback_data: dict):
+@dp.callback_query_handler(enable_bonus_cancel_callback.filter(), UserFilter(only_managers=True), state="*")
+async def process_enable_bonus_cancel(call: types.CallbackQuery, callback_data: dict, state: FSMContext = None):
+    if state:
+        await state.finish()
     bonus_id = callback_data.get("bonus_id")
     await call.message.answer("Bonus was not enabled 😌", reply_markup=manage_keyboard())
     await _send_bonus_info(call.from_user.id, bonus_id)
@@ -259,13 +287,15 @@ async def process_enable_bonus_cancel(call: types.CallbackQuery, callback_data: 
     await sleep(0.5)
 
 
-@dp.callback_query_handler(enable_bonus_approve_callback.filter(), UserFilter(only_managers=True))
-async def process_enable_bonus_approve(call: types.CallbackQuery, callback_data: dict):
+@dp.callback_query_handler(enable_bonus_approve_callback.filter(), UserFilter(only_managers=True), state="*")
+async def process_enable_bonus_approve(call: types.CallbackQuery, callback_data: dict, state: FSMContext = None):
+    if state:
+        await state.finish()
     bonus_id = callback_data.get("bonus_id")
     bonus = BonusLogics.get_by_id(bonus_id)
     try:
         BonusLogics.enable(bonus)
-        await call.answer('The bonus has been enabled!', show_alert=True)
+        await call.answer('The bonus has been enabled! 🟢', show_alert=True)
     except BonusAlreadyEnabledError:
         await call.answer("Ups, the bonus already has been enabled 🤭", show_alert=True)
 
@@ -273,7 +303,7 @@ async def process_enable_bonus_approve(call: types.CallbackQuery, callback_data:
     await process_view_bonus(call, {"bonus_id": bonus_id})
 
 
-@dp.callback_query_handler(disable_bonus_callback.filter(), UserFilter(only_managers=True))
+@dp.callback_query_handler(disable_bonus_callback.filter(), UserFilter(only_managers=True), state="*")
 async def process_disable_bonus(call: types.CallbackQuery, callback_data: dict, state: FSMContext):
     bonus_id = callback_data.get('bonus_id')
     await state.update_data(bonus_id=bonus_id)
@@ -282,8 +312,10 @@ async def process_disable_bonus(call: types.CallbackQuery, callback_data: dict, 
     await call.message.delete()
 
 
-@dp.callback_query_handler(disable_bonus_cancel_callback.filter(), UserFilter(only_managers=True))
-async def process_disable_bonus_cancel(call: types.CallbackQuery, callback_data: dict):
+@dp.callback_query_handler(disable_bonus_cancel_callback.filter(), UserFilter(only_managers=True), state="*")
+async def process_disable_bonus_cancel(call: types.CallbackQuery, callback_data: dict, state: FSMContext = None):
+    if state:
+        await state.finish()
     bonus_id = callback_data.get("bonus_id")
     await call.message.answer("Bonus was not disabled 😌", reply_markup=manage_keyboard())
     await _send_bonus_info(call.from_user.id, bonus_id)
@@ -291,13 +323,15 @@ async def process_disable_bonus_cancel(call: types.CallbackQuery, callback_data:
     await sleep(0.5)
 
 
-@dp.callback_query_handler(disable_bonus_approve_callback.filter(), UserFilter(only_managers=True))
-async def process_disable_bonus_approve(call: types.CallbackQuery, callback_data: dict):
+@dp.callback_query_handler(disable_bonus_approve_callback.filter(), UserFilter(only_managers=True), state="*")
+async def process_disable_bonus_approve(call: types.CallbackQuery, callback_data: dict, state: FSMContext = None):
+    if state:
+        await state.finish()
     bonus_id = callback_data.get("bonus_id")
     bonus = BonusLogics.get_by_id(bonus_id)
     try:
         BonusLogics.disable(bonus)
-        await call.answer('The bonus has been disabled!', show_alert=True)
+        await call.answer('The bonus has been disabled! 🔴', show_alert=True)
     except BonusAlreadyDisabledError:
         await call.answer("Ups, the bonus already has been disabled 🤭", show_alert=True)
 
@@ -305,8 +339,10 @@ async def process_disable_bonus_approve(call: types.CallbackQuery, callback_data
     await process_view_bonus(call, {"bonus_id": bonus_id})
 
 
-@dp.callback_query_handler(set_bonus_all_callback.filter(), UserFilter(only_managers=True))
-async def process_set_bonus_all(call: types.CallbackQuery, callback_data: dict):
+@dp.callback_query_handler(set_bonus_all_callback.filter(), UserFilter(only_managers=True), state="*")
+async def process_set_bonus_all(call: types.CallbackQuery, callback_data: dict, state: FSMContext = None):
+    if state:
+        await state.finish()
     bonus_id = callback_data.get('bonus_id')
     bonus = BonusLogics.get_by_id(bonus_id)
     try:
@@ -319,8 +355,10 @@ async def process_set_bonus_all(call: types.CallbackQuery, callback_data: dict):
     await process_view_bonus(call, {"bonus_id": bonus_id})
 
 
-@dp.callback_query_handler(set_bonus_negative_callback.filter(), UserFilter(only_managers=True))
-async def process_set_bonus_negative(call: types.CallbackQuery, callback_data: dict):
+@dp.callback_query_handler(set_bonus_negative_callback.filter(), UserFilter(only_managers=True), state="*")
+async def process_set_bonus_negative(call: types.CallbackQuery, callback_data: dict, state: FSMContext = None):
+    if state:
+        await state.finish()
     bonus_id = callback_data.get('bonus_id')
     bonus = BonusLogics.get_by_id(bonus_id)
     try:
@@ -333,8 +371,10 @@ async def process_set_bonus_negative(call: types.CallbackQuery, callback_data: d
     await process_view_bonus(call, {"bonus_id": bonus_id})
 
 
-@dp.callback_query_handler(set_bonus_neutral_callback.filter(), UserFilter(only_managers=True))
-async def process_set_bonus_neutral(call: types.CallbackQuery, callback_data: dict):
+@dp.callback_query_handler(set_bonus_neutral_callback.filter(), UserFilter(only_managers=True), state="*")
+async def process_set_bonus_neutral(call: types.CallbackQuery, callback_data: dict, state: FSMContext = None):
+    if state:
+        await state.finish()
     bonus_id = callback_data.get('bonus_id')
     bonus = BonusLogics.get_by_id(bonus_id)
     try:
@@ -347,8 +387,10 @@ async def process_set_bonus_neutral(call: types.CallbackQuery, callback_data: di
     await process_view_bonus(call, {"bonus_id": bonus_id})
 
 
-@dp.callback_query_handler(set_bonus_positive_callback.filter(), UserFilter(only_managers=True))
-async def process_set_bonus_positive(call: types.CallbackQuery, callback_data: dict):
+@dp.callback_query_handler(set_bonus_positive_callback.filter(), UserFilter(only_managers=True), state="*")
+async def process_set_bonus_positive(call: types.CallbackQuery, callback_data: dict, state: FSMContext = None):
+    if state:
+        await state.finish()
     bonus_id = callback_data.get('bonus_id')
     bonus = BonusLogics.get_by_id(bonus_id)
     try:
@@ -361,8 +403,10 @@ async def process_set_bonus_positive(call: types.CallbackQuery, callback_data: d
     await process_view_bonus(call, {"bonus_id": bonus_id})
 
 
-@dp.callback_query_handler(set_bonus_vip_callback.filter(), UserFilter(only_managers=True))
-async def process_set_bonus_vip(call: types.CallbackQuery, callback_data: dict):
+@dp.callback_query_handler(set_bonus_vip_callback.filter(), UserFilter(only_managers=True), state="*")
+async def process_set_bonus_vip(call: types.CallbackQuery, callback_data: dict, state: FSMContext = None):
+    if state:
+        await state.finish()
     bonus_id = callback_data.get('bonus_id')
     bonus = BonusLogics.get_by_id(bonus_id)
     try:
@@ -375,11 +419,11 @@ async def process_set_bonus_vip(call: types.CallbackQuery, callback_data: dict):
     await process_view_bonus(call, {"bonus_id": bonus_id})
 
 
-@dp.callback_query_handler(update_bonus_description_callback.filter(), UserFilter(only_managers=True))
+@dp.callback_query_handler(update_bonus_description_callback.filter(), UserFilter(only_managers=True), state="*")
 async def process_update_bonus_description(call: types.CallbackQuery, callback_data: dict, state: FSMContext):
     bonus_id = callback_data.get("bonus_id")
     await state.update_data(bonus_id=bonus_id)
-    await call.message.answer("Enter new bonus description (<1000 symbols)👉:", reply_markup=cancel_keyboard())
+    await call.message.answer("📝 Enter new bonus description (&lt;1000 symbols) 👉:", reply_markup=cancel_keyboard(), parse_mode="HTML")
     await call.message.delete()
     await UpdateBonusDescription.send_bonus_description.set()
 
@@ -419,7 +463,7 @@ async def process_confirm_bonus_description(message: types.Message, state: FSMCo
     await _send_bonus_info(message.from_user.id, bonus_id)
 
 
-@dp.callback_query_handler(update_bonus_image_url_callback.filter(), UserFilter(only_managers=True))
+@dp.callback_query_handler(update_bonus_image_url_callback.filter(), UserFilter(only_managers=True), state="*")
 async def process_update_image_url(call: types.CallbackQuery, callback_data: dict, state: FSMContext):
     bonus_id = callback_data.get("bonus_id")
     await state.update_data(bonus_id=bonus_id)
@@ -523,10 +567,7 @@ async def process_confirm_bonus_image_url(message: types.Message, state: FSMCont
     await _send_bonus_info(message.from_user.id, bonus_id)
 
 
-    await _send_bonus_info(message.from_user.id, bonus_id)
-
-
-@dp.callback_query_handler(delete_bonus_callback.filter(), UserFilter(only_managers=True))
+@dp.callback_query_handler(delete_bonus_callback.filter(), UserFilter(only_managers=True), state="*")
 async def process_delete_bonus(call: types.CallbackQuery, callback_data: dict, state: FSMContext):
     bonus_id = callback_data.get("bonus_id")
     await state.update_data(bonus_id=bonus_id)
@@ -535,8 +576,10 @@ async def process_delete_bonus(call: types.CallbackQuery, callback_data: dict, s
     await call.message.delete()
 
 
-@dp.callback_query_handler(delete_bonus_approve_callback.filter(), UserFilter(only_managers=True))
-async def process_delete_bonus_approve(call: types.CallbackQuery, callback_data: dict):
+@dp.callback_query_handler(delete_bonus_approve_callback.filter(), UserFilter(only_managers=True), state="*")
+async def process_delete_bonus_approve(call: types.CallbackQuery, callback_data: dict, state: FSMContext = None):
+    if state:
+        await state.finish()
     bonus_id = callback_data.get("bonus_id")
     bonus = BonusLogics.get_by_id(bonus_id)
     try:
@@ -549,8 +592,10 @@ async def process_delete_bonus_approve(call: types.CallbackQuery, callback_data:
     await sleep(0.5)
 
 
-@dp.callback_query_handler(delete_bonus_cancel_callback.filter(), UserFilter(only_managers=True))
-async def process_delete_bonus_cancel(call: types.CallbackQuery, callback_data: dict):
+@dp.callback_query_handler(delete_bonus_cancel_callback.filter(), UserFilter(only_managers=True), state="*")
+async def process_delete_bonus_cancel(call: types.CallbackQuery, callback_data: dict, state: FSMContext = None):
+    if state:
+        await state.finish()
     bonus_id = callback_data.get("bonus_id")
     await call.message.answer("Huh, the bonus was not removed 😌", reply_markup=manage_keyboard())
     await _send_bonus_info(call.from_user.id, bonus_id)
@@ -558,7 +603,7 @@ async def process_delete_bonus_cancel(call: types.CallbackQuery, callback_data: 
     await sleep(0.5)
 
 
-@dp.callback_query_handler(set_bonus_for_request_callback.filter(), UserFilter(only_managers=True))
+@dp.callback_query_handler(set_bonus_for_request_callback.filter(), UserFilter(only_managers=True), state="*")
 async def process_set_bonus_is_for_request(call: types.CallbackQuery, callback_data: dict, state: FSMContext):
     bonus_id = callback_data.get('bonus_id')
     await state.update_data(bonus_id=bonus_id)
@@ -567,8 +612,10 @@ async def process_set_bonus_is_for_request(call: types.CallbackQuery, callback_d
     await call.message.delete()
 
 
-@dp.callback_query_handler(set_bonus_for_request_cancel_callback.filter(), UserFilter(only_managers=True))
-async def process_set_bonus_for_request_cancel(call: types.CallbackQuery, callback_data: dict):
+@dp.callback_query_handler(set_bonus_for_request_cancel_callback.filter(), UserFilter(only_managers=True), state="*")
+async def process_set_bonus_for_request_cancel(call: types.CallbackQuery, callback_data: dict, state: FSMContext = None):
+    if state:
+        await state.finish()
     bonus_id = callback_data.get("bonus_id")
     await call.message.answer("Huh, the bonus was not set for requests 😌", reply_markup=manage_keyboard())
     await _send_bonus_info(call.from_user.id, bonus_id)
@@ -576,8 +623,10 @@ async def process_set_bonus_for_request_cancel(call: types.CallbackQuery, callba
     await sleep(0.5)
 
 
-@dp.callback_query_handler(set_bonus_for_request_approve_callback.filter(), UserFilter(only_managers=True))
-async def process_set_bonus_for_request_approve(call: types.CallbackQuery, callback_data: dict):
+@dp.callback_query_handler(set_bonus_for_request_approve_callback.filter(), UserFilter(only_managers=True), state="*")
+async def process_set_bonus_for_request_approve(call: types.CallbackQuery, callback_data: dict, state: FSMContext = None):
+    if state:
+        await state.finish()
     bonus_id = callback_data.get("bonus_id")
     bonus = BonusLogics.get_by_id(bonus_id)
     try:
@@ -590,7 +639,7 @@ async def process_set_bonus_for_request_approve(call: types.CallbackQuery, callb
     await process_view_bonus(call, {"bonus_id": bonus_id})
 
 
-@dp.callback_query_handler(set_bonus_not_for_request_callback.filter(), UserFilter(only_managers=True))
+@dp.callback_query_handler(set_bonus_not_for_request_callback.filter(), UserFilter(only_managers=True), state="*")
 async def process_set_bonus_not_for_request(call: types.CallbackQuery, callback_data: dict, state: FSMContext):
     bonus_id = callback_data.get('bonus_id')
     await state.update_data(bonus_id=bonus_id)
@@ -599,8 +648,10 @@ async def process_set_bonus_not_for_request(call: types.CallbackQuery, callback_
     await call.message.delete()
 
 
-@dp.callback_query_handler(set_bonus_not_for_request_cancel_callback.filter(), UserFilter(only_managers=True))
-async def process_set_bonus_not_for_request_cancel(call: types.CallbackQuery, callback_data: dict):
+@dp.callback_query_handler(set_bonus_not_for_request_cancel_callback.filter(), UserFilter(only_managers=True), state="*")
+async def process_set_bonus_not_for_request_cancel(call: types.CallbackQuery, callback_data: dict, state: FSMContext = None):
+    if state:
+        await state.finish()
     bonus_id = callback_data.get("bonus_id")
     await call.message.answer("Huh, the bonus was not set for Info only 😌", reply_markup=manage_keyboard())
     await _send_bonus_info(call.from_user.id, bonus_id)
@@ -608,8 +659,10 @@ async def process_set_bonus_not_for_request_cancel(call: types.CallbackQuery, ca
     await sleep(0.5)
 
 
-@dp.callback_query_handler(set_bonus_not_for_request_approve_callback.filter(), UserFilter(only_managers=True))
-async def process_set_bonus_not_for_request_approve(call: types.CallbackQuery, callback_data: dict):
+@dp.callback_query_handler(set_bonus_not_for_request_approve_callback.filter(), UserFilter(only_managers=True), state="*")
+async def process_set_bonus_not_for_request_approve(call: types.CallbackQuery, callback_data: dict, state: FSMContext = None):
+    if state:
+        await state.finish()
     bonus_id = callback_data.get("bonus_id")
     bonus = BonusLogics.get_by_id(bonus_id)
     try:

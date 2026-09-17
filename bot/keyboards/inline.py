@@ -507,11 +507,14 @@ def open_users_per_group_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
 
 
-def user_keyboard(opened_user_id: str, is_opened_user_blocked: bool):
+def user_keyboard(opened_user_id: str, is_opened_user_blocked: bool, current_group: str = None):
+    group_icon = user_group_display_dict.get(current_group, [DefaultInlineButtons.VIPBonus.value])[0] if current_group else "🟧"
+    group_button_text = f"⚙️{group_icon}"
+
     manage_buttons = [
         InlineKeyboardButton(text=DefaultInlineButtons.MessageUser.value,
                              callback_data=message_user_callback.new(opened_user_id=opened_user_id)),
-        InlineKeyboardButton(text=DefaultInlineButtons.SetUserGroup.value,
+        InlineKeyboardButton(text=group_button_text,
                              callback_data=change_user_group_callback.new(opened_user_id=opened_user_id)),
         InlineKeyboardButton(text=DefaultInlineButtons.SetUserCountry.value,
                              callback_data=change_user_country_callback.new(opened_user_id=opened_user_id))
@@ -597,26 +600,32 @@ def bonus_request_keyboard(bonus_id: str, bonus_request_id: str,
 
 def change_bonus_group_keyboard(bonus_id: str, current_group: str):
     bonus_group_buttons = []
-    for i, v in group_display_dict.items():
-        if i != current_group:
-            bonus_group_buttons.append(InlineKeyboardButton(text=f'{v[0]}', callback_data=v[1].new(bonus_id=bonus_id)))
+    for g_key, data in group_display_dict.items():
+        if g_key != current_group:
+            bonus_group_buttons.append(
+                InlineKeyboardButton(text=f"{data[0]} {g_key}", callback_data=data[1].new(bonus_id=bonus_id))
+            )
 
-    return InlineKeyboardMarkup(inline_keyboard=[
-        bonus_group_buttons,
-        [InlineKeyboardButton(text=DefaultInlineButtons.Cancel.value, callback_data=change_bonus_group_cancel_callback.new(bonus_id=bonus_id))]
+    rows = [bonus_group_buttons[i:i+2] for i in range(0, len(bonus_group_buttons), 2)]
+    rows.append([
+        InlineKeyboardButton(text=DefaultInlineButtons.Cancel.value, callback_data=change_bonus_group_cancel_callback.new(bonus_id=bonus_id))
     ])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def change_user_group_keyboard(opened_user_id: str, current_group: str):
     user_group_buttons = []
-    for i, v in user_group_display_dict.items():
-        if i != current_group:
-            user_group_buttons.append(InlineKeyboardButton(text=f'{v[0]}', callback_data=v[1].new(opened_user_id=opened_user_id)))
+    for g_key, data in user_group_display_dict.items():
+        if g_key != current_group:
+            user_group_buttons.append(
+                InlineKeyboardButton(text=f"{data[0]} {g_key}", callback_data=data[1].new(opened_user_id=opened_user_id))
+            )
 
-    return InlineKeyboardMarkup(inline_keyboard=[
-        user_group_buttons,
-        [InlineKeyboardButton(text=DefaultInlineButtons.Cancel.value, callback_data=change_user_group_cancel_callback.new(opened_user_id=opened_user_id))]
+    rows = [user_group_buttons[i:i+2] for i in range(0, len(user_group_buttons), 2)]
+    rows.append([
+        InlineKeyboardButton(text=DefaultInlineButtons.Cancel.value, callback_data=change_user_group_cancel_callback.new(opened_user_id=opened_user_id))
     ])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def bonus_keyboard(bonus_id: str, is_bonus_active: bool, current_group: str,
@@ -658,6 +667,9 @@ def bonus_keyboard(bonus_id: str, is_bonus_active: bool, current_group: str,
 
         inline_keyboard.append(row1)
 
+        group_icon = group_display_dict.get(current_group, [DefaultInlineButtons.AllBonus.value])[0]
+        group_button_text = f"⚙️{group_icon}"
+
         row2 = [
             InlineKeyboardButton(text=DefaultInlineButtons.UpdateBonusDescription.value,
                                  callback_data=update_bonus_description_callback.new(bonus_id=bonus_id)),
@@ -665,7 +677,7 @@ def bonus_keyboard(bonus_id: str, is_bonus_active: bool, current_group: str,
                                  callback_data=update_bonus_image_url_callback.new(bonus_id=bonus_id)),
             InlineKeyboardButton(text=DefaultInlineButtons.DeleteBonus.value,
                                  callback_data=delete_bonus_callback.new(bonus_id=bonus_id)),
-            InlineKeyboardButton(text=DefaultInlineButtons.SetBonusGroup.value,
+            InlineKeyboardButton(text=group_button_text,
                                  callback_data=change_bonus_group_callback.new(bonus_id=bonus_id)),
             InlineKeyboardButton(text=DefaultInlineButtons.SetBonusCountry.value,
                                  callback_data=change_bonus_country_callback.new(bonus_id=bonus_id))

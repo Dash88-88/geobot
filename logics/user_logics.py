@@ -1,3 +1,4 @@
+import logging
 from typing import List, Optional
 from peewee import ModelSelect, fn
 from common.constants import BuiltInReferralSources, Groups
@@ -196,11 +197,43 @@ class UserLogics:
     async def is_subscriber_in_chat(cls, bot: Bot, channel_identifier: str, chat_id: int) -> bool:
         if not channel_identifier:
             return False
+        
+        target_chat_raw = str(channel_identifier).strip()
+        if not target_chat_raw:
+            return False
+
+        # Normalize potential URLs: e.g. https://t.me/mychannel or t.me/mychannel
+        if "t.me/" in target_chat_raw:
+            clean_part = target_chat_raw.split("t.me/")[-1].strip("/")
+            if not clean_part.startswith("+") and not clean_part.startswith("joinchat/"):
+                target_chat_raw = f"@{clean_part.lstrip('@')}"
+        elif not target_chat_raw.startswith("@") and not target_chat_raw.startswith("-") and not target_chat_raw.isdigit():
+            target_chat_raw = f"@{target_chat_raw}"
+
         try:
-            target_chat = int(channel_identifier) if (channel_identifier.startswith('-') or channel_identifier.isdigit()) else channel_identifier
+            if target_chat_raw.startswith("-") or target_chat_raw.isdigit():
+                target_chat = int(target_chat_raw)
+            else:
+                target_chat = target_chat_raw
+
             member = await bot.get_chat_member(chat_id=target_chat, user_id=chat_id)
-            return member.status in ('member', 'administrator', 'creator')
-        except (BadRequest, Exception):
+            if hasattr(member, 'is_chat_member') and callable(member.is_chat_member):
+                is_sub = bool(member.is_chat_member())
+            else:
+                is_sub = member.status in ('member', 'administrator', 'creator', 'owner') or (
+                    member.status == 'restricted' and getattr(member, 'is_member', True)
+                )
+
+            logging.info(f"Subscription check: user={chat_id}, channel={target_chat}, status={getattr(member, 'status', None)} -> is_subscriber={is_sub}")
+            return is_sub
+        except BadRequest as e:
+            logging.warning(
+                f"Subscription check BadRequest for user {chat_id} in channel '{channel_identifier}' (resolved to '{target_chat_raw}'): {e}. "
+                "Ensure the bot is added as an ADMINISTRATOR to this channel and the channel ID / @username is correct."
+            )
+            return False
+        except Exception as e:
+            logging.error(f"Subscription check unexpected error for user {chat_id} in channel '{channel_identifier}': {e}")
             return False
 
     @classmethod
@@ -208,17 +241,21 @@ class UserLogics:
         if not user:
             user = cls.get_by_chat_id(chat_id)
 
-        # 1. If user has a country with a channel_id set, check it first
+        target_channels = []
         if user and user.country and user.country.channel_id:
-            is_sub = await cls.is_subscriber_in_chat(bot, user.country.channel_id, chat_id)
-            if is_sub:
-                return True
+            target_channels.append(user.country.channel_id)
+        if CHANNEL_ID and CHANNEL_ID not in target_channels:
+            target_channels.append(CHANNEL_ID)
+        if CHANNEL_USERNAME and CHANNEL_USERNAME not in target_channels:
+            target_channels.append(CHANNEL_USERNAME)
 
-        # 2. Fallback to global config channels if configured
-        if CHANNEL_USERNAME and await cls.is_subscriber_in_chat(bot, CHANNEL_USERNAME, chat_id):
+        # If no channel is configured anywhere, subscription is not required
+        if not target_channels:
             return True
-        if CHANNEL_ID and await cls.is_subscriber_in_chat(bot, CHANNEL_ID, chat_id):
-            return True
+
+        for ch in target_channels:
+            if await cls.is_subscriber_in_chat(bot, ch, chat_id):
+                return True
 
         return False
 

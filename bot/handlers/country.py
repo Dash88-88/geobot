@@ -2,7 +2,7 @@ import logging
 from asyncio import sleep
 from aiogram import types
 from aiogram.dispatcher import FSMContext
-from aiogram.dispatcher.filters import Text
+from aiogram.dispatcher.filters.builtin import Command, Text
 from aiogram.types import ContentType
 
 from bot.filters import UserFilter
@@ -41,6 +41,7 @@ from bot.states import (
     UpdateCountryCode,
     UpdateCountryChannelId,
     UpdateCountryChannelUrl,
+    UpdateSiteID,
 )
 from common.constants import (
     DefaultKeyboardButtons,
@@ -52,7 +53,7 @@ from common.exceptions import (
     CountryAlreadyDisabledError,
     CountryAlreadyRemovedError,
 )
-from config import BONUS_TRANSFER_URL
+from config import BONUS_TRANSFER_URL, REGISTRATION_URL
 from logics import UserLogics, CountryLogics, BonusLogics
 from models import Country
 
@@ -90,24 +91,38 @@ async def process_select_country(call: types.CallbackQuery, callback_data: dict,
     await call.answer(f"Country selected: {country.name} ✅")
     await call.message.delete()
 
-    if is_change:
+    if is_change and user.site_id:
         await call.message.answer(
             f"🌍 Your country has been updated to <b>{country.name}</b>!",
             reply_markup=main_menu_keyboard(),
             parse_mode="HTML"
         )
+    elif not user.site_id and not user.is_manager:
+        await UpdateSiteID.send_site_id.set()
+        reg_link = f"\n\nDon't have an account yet? Register <a href='{REGISTRATION_URL}'>HERE</a>" if REGISTRATION_URL else ""
+        await call.message.answer(
+            f"🌍 Country selected: <b>{country.name}</b>\n\n"
+            f"🃏 <b>Please enter your Site ID / Nickname:</b>\n"
+            f"<i>Without Site ID / Nickname, you will not be able to use the bot and request bonuses.</i>"
+            f"{reg_link}",
+            parse_mode="HTML"
+        )
     else:
         # First start onboarding completion
-        await call.message.answer_photo(
-            photo='https://i.pinimg.com/736x/f9/32/f2/f932f20f8e4f42ccef38af270f323b08.jpg',
-            caption="Start smart. Feel the edge from the very first move.\n\n",
-            parse_mode="HTML",
-            reply_markup=message_inline_button_keyboard(BONUS_TRANSFER_URL) if BONUS_TRANSFER_URL else None
-        )
+        try:
+            await call.message.answer_photo(
+                photo='https://i.pinimg.com/736x/f9/32/f2/f932f20f8e4f42ccef38af270f323b08.jpg',
+                caption="Start smart. Feel the edge from the very first move.\n\n",
+                parse_mode="HTML",
+                reply_markup=message_inline_button_keyboard(BONUS_TRANSFER_URL) if BONUS_TRANSFER_URL else None
+            )
+        except Exception as e:
+            logging.warning(f"Could not send onboarding photo: {e}")
+
         await call.message.answer(
             f"Welcome, {call.from_user.first_name or 'friend'} 👋!\n"
             f"🌍 Country: <b>{country.name}</b>",
-            reply_markup=main_menu_keyboard(),
+            reply_markup=main_menu_keyboard() if not user.is_manager else manage_keyboard(),
             parse_mode="HTML"
         )
 
@@ -157,9 +172,12 @@ async def _send_country_card(chat_id: int, country_id: str):
     )
 
 
-@dp.message_handler(UserFilter(only_managers=True), Text(DefaultKeyboardButtons.Countries.value))
-@dp.callback_query_handler(UserFilter(only_managers=True), text=CallbackQueryTypes.ManageCountries.value)
-async def process_admin_countries_list(update: types.Message or types.CallbackQuery):
+@dp.message_handler(UserFilter(only_managers=True), Command("countries"), state="*")
+@dp.message_handler(UserFilter(only_managers=True), Text([DefaultKeyboardButtons.Countries.value, "🌍 Countries", "Страны"]), state="*")
+@dp.callback_query_handler(UserFilter(only_managers=True), text=CallbackQueryTypes.ManageCountries.value, state="*")
+async def process_admin_countries_list(update: types.Message or types.CallbackQuery, state: FSMContext = None):
+    if state:
+        await state.finish()
 
     countries = CountryLogics.get_list(is_removed=False)
     message = update.message if isinstance(update, types.CallbackQuery) else update
