@@ -5,6 +5,7 @@ from asyncio import sleep
 from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Text
+from aiogram.types import ContentType
 from bot.filters import UserFilter
 from bot.keyboards.callback_datas import (
     view_bonus_callback,
