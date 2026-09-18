@@ -2,7 +2,7 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from common.constants import DefaultKeyboardButtons
 
 
-def main_menu_keyboard():
+def main_menu_keyboard(is_manager: bool = False):
     keyboard = [
         [
             KeyboardButton(DefaultKeyboardButtons.BonusTransfer.value),
@@ -16,6 +16,10 @@ def main_menu_keyboard():
             KeyboardButton(DefaultKeyboardButtons.Invite.value),
         ],
     ]
+    if is_manager:
+        keyboard.append([
+            KeyboardButton(DefaultKeyboardButtons.AdminPanel.value),
+        ])
 
     return ReplyKeyboardMarkup(
         keyboard=keyboard,
@@ -49,6 +53,7 @@ def manage_keyboard():
                 KeyboardButton(DefaultKeyboardButtons.SendMessageToCountryGroup.value)
             ],
             [
+                KeyboardButton(DefaultKeyboardButtons.UserMenu.value),
                 KeyboardButton(DefaultKeyboardButtons.Cancel.value)
             ]
         ],

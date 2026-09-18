@@ -5,6 +5,7 @@ from common.constants import (
     InlineQueryTypes,
     DefaultInlineButtons,
     BonusRequestRejectReasons,
+    BonusRequestRejectReasonTitles,
     bonus_request_icon_dict,
     DefaultKeyboardButtons,
 )
@@ -357,10 +358,10 @@ def approve_bonus_request_confirmation_keyboard(bonus_request_id: str):
 
 def cancel_bonus_request_options_keyboard(bonus_request_id: str):
     inline_keyboard = []
-    for reason in BonusRequestRejectReasons.keys():
+    for code, title in BonusRequestRejectReasonTitles.items():
         button = InlineKeyboardButton(
-            text=f'{reason}',
-            callback_data=cancel_br_approve_opt_callback.new(bonus_request_id=bonus_request_id, reject_reason=reason)
+            text=f'{title}',
+            callback_data=cancel_br_approve_opt_callback.new(bonus_request_id=bonus_request_id, reject_reason=code)
         )
         inline_keyboard.append([button])
 

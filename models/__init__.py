@@ -18,4 +18,8 @@ def create_tables():
             ScheduledTarget
         ]
     )
+    try:
+        db.execute_sql("ALTER TABLE bonusrequest ADD COLUMN IF NOT EXISTS reject_reason character varying(255);")
+    except Exception:
+        pass
 

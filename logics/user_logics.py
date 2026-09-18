@@ -114,7 +114,10 @@ class UserLogics:
 
     @classmethod
     def get_group_list(cls, group: str) -> List[User]:
-        return list(cls.get_query().where(User.group == group))
+        query = cls.get_query()
+        if group and group != Groups.All.value:
+            query = query.where(User.group == group)
+        return list(query)
 
     @classmethod
     def get_country_list(cls, country_id: str = None, group: str = None) -> List[User]:
@@ -210,6 +213,12 @@ class UserLogics:
         elif not target_chat_raw.startswith("@") and not target_chat_raw.startswith("-") and not target_chat_raw.isdigit():
             target_chat_raw = f"@{target_chat_raw}"
 
+        # Auto-fix positive channel IDs missing -100 prefix (e.g. 3461206542 -> -1003461206542)
+        if target_chat_raw.isdigit():
+            target_chat_raw = f"-100{target_chat_raw}"
+        elif target_chat_raw.startswith("-") and not target_chat_raw.startswith("-100") and target_chat_raw[1:].isdigit():
+            target_chat_raw = f"-100{target_chat_raw[1:]}"
+
         try:
             if target_chat_raw.startswith("-") or target_chat_raw.isdigit():
                 target_chat = int(target_chat_raw)
@@ -304,3 +313,12 @@ class UserLogics:
                 })
 
         return top_referrers
+
+    @classmethod
+    def get_safe_country(cls, user: Optional[User]):
+        if not user or not getattr(user, 'country_id', None):
+            return None
+        try:
+            return user.country
+        except Exception:
+            return None

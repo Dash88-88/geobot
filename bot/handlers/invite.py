@@ -1,10 +1,11 @@
 from aiogram import types
-from aiogram.dispatcher.filters import Text
+from aiogram.dispatcher import FSMContext
+from aiogram.dispatcher.filters.builtin import Command, Text
 from bot.filters import UserFilter
 from bot.keyboards.inline import invite_keyboard, share_keyboard
 from bot.loader import dp
 from common.constants import DefaultKeyboardButtons, InlineQueryTypes
-from config import RESOURCE_NAME
+from config import RESOURCE_NAME, BOT_ADMINS
 from logics import UserLogics
 
 REFERRAL_LINK_TEMPLATE = "https://t.me/%s?start=%s"
@@ -14,9 +15,30 @@ def _get_referral_link(bot_username: str, arg: str):
     return REFERRAL_LINK_TEMPLATE % (bot_username, arg)
 
 
-@dp.message_handler(Text(DefaultKeyboardButtons.Invite.value), UserFilter())
-async def process_invite(message: types.Message):
+@dp.message_handler(Command(["invite", "ref", "referral"]), UserFilter(), state="*")
+@dp.message_handler(
+    Text([
+        DefaultKeyboardButtons.Invite.value,
+        "📨 Refer a friend",
+        "Refer a friend",
+        "Invite"
+    ], ignore_case=True),
+    UserFilter(),
+    state="*"
+)
+async def process_invite(message: types.Message, state: FSMContext = None):
+    if state:
+        await state.finish()
     user = UserLogics.get_by_chat_id(message.from_user.id)
+    if not user:
+        user = UserLogics.create(
+            chat_id=message.from_user.id,
+            username=message.from_user.username,
+            nickname=message.from_user.username or message.from_user.first_name or str(message.from_user.id),
+            site_id='',
+            is_manager=bool(message.from_user.id in BOT_ADMINS)
+        )
+
     referral_link = _get_referral_link((await message.bot.get_me()).username, user.id)
 
     await message.answer(
@@ -30,6 +52,15 @@ async def process_invite(message: types.Message):
 @dp.inline_handler(UserFilter(), text=InlineQueryTypes.Invite.value)
 async def share_query(query: types.InlineQuery):
     user = UserLogics.get_by_chat_id(query.from_user.id)
+    if not user:
+        user = UserLogics.create(
+            chat_id=query.from_user.id,
+            username=query.from_user.username,
+            nickname=query.from_user.username or query.from_user.first_name or str(query.from_user.id),
+            site_id='',
+            is_manager=bool(query.from_user.id in BOT_ADMINS)
+        )
+
     referral_link = _get_referral_link((await query.bot.get_me()).username, user.id)
 
     await query.answer(

@@ -13,12 +13,23 @@ class CountryLogics:
     def get_query() -> ModelSelect:
         return Country.select()
 
+    @staticmethod
+    def _normalize_channel_id(channel_id: str) -> str:
+        if not channel_id:
+            return ''
+        cid = str(channel_id).strip()
+        if cid.isdigit():
+            return f"-100{cid}"
+        if cid.startswith("-") and not cid.startswith("-100") and cid[1:].isdigit():
+            return f"-100{cid[1:]}"
+        return cid
+
     @classmethod
     def create(cls, name: str, code: str, channel_id: str = '', channel_url: str = '', is_active: bool = True) -> Country:
         country = Country.create(
             name=name.strip(),
             code=code.strip().upper(),
-            channel_id=channel_id.strip() if channel_id else '',
+            channel_id=cls._normalize_channel_id(channel_id),
             channel_url=channel_url.strip() if channel_url else '',
             is_active=is_active,
             is_removed=False
@@ -98,7 +109,7 @@ class CountryLogics:
             country.code = code.strip().upper()
             fields_to_update.append(Country.code)
         if channel_id is not None:
-            country.channel_id = channel_id.strip()
+            country.channel_id = cls._normalize_channel_id(channel_id)
             fields_to_update.append(Country.channel_id)
         if channel_url is not None:
             country.channel_url = channel_url.strip()

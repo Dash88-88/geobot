@@ -9,3 +9,4 @@ class BonusRequest(BaseModel):
     user = ForeignKeyField(User, backref='bonus_request_query')
     bonus = ForeignKeyField(Bonus, backref='bonus_request_query')
     status = CharField(default=BonusRequestStatuses.Active.value)
+    reject_reason = CharField(null=True)

@@ -173,7 +173,7 @@ async def _send_country_card(chat_id: int, country_id: str):
 
 
 @dp.message_handler(UserFilter(only_managers=True), Command("countries"), state="*")
-@dp.message_handler(UserFilter(only_managers=True), Text([DefaultKeyboardButtons.Countries.value, "🌍 Countries", "Страны"]), state="*")
+@dp.message_handler(UserFilter(only_managers=True), Text([DefaultKeyboardButtons.Countries.value, "🌍 Countries"], ignore_case=True), state="*")
 @dp.callback_query_handler(UserFilter(only_managers=True), text=CallbackQueryTypes.ManageCountries.value, state="*")
 async def process_admin_countries_list(update: types.Message or types.CallbackQuery, state: FSMContext = None):
     if state:

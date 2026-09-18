@@ -13,20 +13,21 @@ class UserFilter(BoundFilter):
         super().__init__(*args, **kwargs)
 
     async def check(self, update: types.Message or types.CallbackQuery):
-        user_id = update.from_user.id
+        from_user = getattr(update, 'from_user', None)
+        if not from_user:
+            return False
+        user_id = from_user.id
         user = UserLogics.get_by_chat_id(user_id)
 
         if not user:
-            if user_id in BOT_ADMINS:
-                user = UserLogics.create(
-                    chat_id=user_id,
-                    username=update.from_user.username,
-                    nickname=update.from_user.username or update.from_user.first_name or str(user_id),
-                    site_id='',
-                    is_manager=True
-                )
-            else:
-                return False
+            is_admin = bool(user_id in BOT_ADMINS)
+            user = UserLogics.create(
+                chat_id=user_id,
+                username=update.from_user.username,
+                nickname=update.from_user.username or update.from_user.first_name or str(user_id),
+                site_id='',
+                is_manager=is_admin
+            )
 
         if user.is_blocked:
             return False

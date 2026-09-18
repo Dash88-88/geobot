@@ -43,7 +43,7 @@ from bot.keyboards.callback_datas import (
     approve_country_group_message_callback,
     cancel_country_group_message_callback,
 )
-from bot.keyboards.default import manage_keyboard, cancel_keyboard
+from bot.keyboards.default import manage_keyboard, cancel_keyboard, main_menu_keyboard
 from bot.keyboards.inline import (
     view_bonus_keyboard,
     message_group_keyboard,
@@ -92,16 +92,27 @@ from models import User
 regex = r"\((?=[^)]*\d)[\d:]+\)"
 
 
-@dp.message_handler(Command(BotCommands.Manage.value), UserFilter(only_managers=True), state="*")
+@dp.message_handler(Command([BotCommands.Manage.value, "admin", "panel"]), UserFilter(only_managers=True), state="*")
+@dp.message_handler(Text([DefaultKeyboardButtons.AdminPanel.value, "🛠️ Admin Panel", "Admin Panel", "Manage"], ignore_case=True), UserFilter(only_managers=True), state="*")
 async def process_manage(message: types.Message, state: FSMContext = None):
     if state:
         await state.finish()
     await message.answer("🛠️ <b>Admin Management Panel</b>", reply_markup=manage_keyboard(), parse_mode="HTML")
 
 
+@dp.message_handler(Command(["user", "menu", "usermenu"]), UserFilter(), state="*")
+@dp.message_handler(Text([DefaultKeyboardButtons.UserMenu.value, "👤 User Menu", "User Menu", "Exit Admin Panel"], ignore_case=True), UserFilter(), state="*")
+async def process_switch_to_user_menu(message: types.Message, state: FSMContext = None):
+    if state:
+        await state.finish()
+    user = UserLogics.get_by_chat_id(message.from_user.id)
+    is_manager = bool(user and user.is_manager)
+    await message.answer("Switched to <b>User Menu</b> 👤", reply_markup=main_menu_keyboard(is_manager=is_manager), parse_mode="HTML")
+
+
 # ==================== REPORT GENERATION ====================
 
-@dp.message_handler(Text([DefaultKeyboardButtons.ReportsGeneration.value, "⚙️ 📊", "Отчеты"]), UserFilter(only_managers=True), state="*")
+@dp.message_handler(Text([DefaultKeyboardButtons.ReportsGeneration.value, "⚙️ 📊", "Reports"], ignore_case=True), UserFilter(only_managers=True), state="*")
 async def process_report_generation(message: types.Message, state: FSMContext = None):
     if state:
         await state.finish()
@@ -261,7 +272,6 @@ def get_paginated_filtered_bonus_requests(bonus_request_status: str, page: int, 
         "⚙️ 🎁",
         "⚙ 🎁",
         "Create Bonus",
-        "Создать бонус",
         "+ Create Bonus"
     ], ignore_case=True),
     UserFilter(only_managers=True),
@@ -387,7 +397,7 @@ async def process_approve_send_bonus_to_group(call: types.CallbackQuery, callbac
 
     for g_user in group_users:
         try:
-            is_requested = len(BonusRequestLogics.get_list(user_id=g_user.id, bonus_id=bonus_id)) > 0
+            is_requested = len([r for r in BonusRequestLogics.get_list(user_id=g_user.id, bonus_id=bonus_id) if r.status in (BonusRequestStatuses.Active.value, BonusRequestStatuses.Approved.value)]) > 0
             await _send_bonus_info(user_id=g_user.chat_id, bonus_id=bonus_id, is_requested=is_requested)
         except (BotBlocked, ChatNotFound, UserDeactivated):
             g_user.is_active = False
@@ -597,17 +607,24 @@ async def process_confirm_message_to_group_sending(message: types.Message, state
     )
 
 
-@dp.callback_query_handler(UserFilter(only_managers=True), cancel_group_message_callback.filter(), state=SendMessageToGroup.send_message)
-async def cancel_group_message_handler(call: types.CallbackQuery, state: FSMContext):
-    await call.message.delete()
+@dp.callback_query_handler(UserFilter(only_managers=True), cancel_group_message_callback.filter(), state="*")
+async def cancel_group_message_handler(call: types.CallbackQuery, state: FSMContext = None):
+    try:
+        await call.message.delete()
+    except Exception:
+        pass
     await call.message.answer("🚫 Group message cancelled.", reply_markup=manage_keyboard())
-    await state.finish()
+    if state:
+        await state.finish()
 
 
-@dp.callback_query_handler(UserFilter(only_managers=True), approve_group_message_callback.filter(), state=SendMessageToGroup.send_message)
-async def approve_group_message_handler(call: types.CallbackQuery, state: FSMContext):
-    data = await state.get_data()
-    await call.message.delete()
+@dp.callback_query_handler(UserFilter(only_managers=True), approve_group_message_callback.filter(), state="*")
+async def approve_group_message_handler(call: types.CallbackQuery, state: FSMContext = None):
+    data = await state.get_data() if state else {}
+    try:
+        await call.message.delete()
+    except Exception:
+        pass
 
     group = data.get("group")
     text = data.get("text")
@@ -617,14 +634,22 @@ async def approve_group_message_handler(call: types.CallbackQuery, state: FSMCon
     send_at = datetime.fromisoformat(send_at_str) if send_at_str else None
     manager = UserLogics.get_by_chat_id(call.from_user.id)
 
+    if not text or not group:
+        await call.message.answer("⚠️ Message session expired. Please try sending again.", reply_markup=manage_keyboard())
+        if state:
+            await state.finish()
+        return
+
     users = [u for u in UserLogics.get_group_list(group) if u.is_active and not u.is_blocked]
     if not users:
         await call.message.answer("🚫 No active users found in the selected group.", reply_markup=manage_keyboard())
-        await state.finish()
+        if state:
+            await state.finish()
         return
 
     await _execute_broadcast(call, manager, users, text, image_url, button_url, send_at, target_name=f"group {group}")
-    await state.finish()
+    if state:
+        await state.finish()
 
 
 # ==================== BROADCAST TO COUNTRY ====================
@@ -690,17 +715,24 @@ async def process_confirm_message_to_country(message: types.Message, state: FSMC
     )
 
 
-@dp.callback_query_handler(UserFilter(only_managers=True), cancel_country_message_callback.filter(), state=SendMessageToCountry.send_message)
-async def cancel_country_message_handler(call: types.CallbackQuery, state: FSMContext):
-    await call.message.delete()
+@dp.callback_query_handler(UserFilter(only_managers=True), cancel_country_message_callback.filter(), state="*")
+async def cancel_country_message_handler(call: types.CallbackQuery, state: FSMContext = None):
+    try:
+        await call.message.delete()
+    except Exception:
+        pass
     await call.message.answer("🚫 Country message cancelled.", reply_markup=manage_keyboard())
-    await state.finish()
+    if state:
+        await state.finish()
 
 
-@dp.callback_query_handler(UserFilter(only_managers=True), approve_country_message_callback.filter(), state=SendMessageToCountry.send_message)
-async def approve_country_message_handler(call: types.CallbackQuery, state: FSMContext):
-    data = await state.get_data()
-    await call.message.delete()
+@dp.callback_query_handler(UserFilter(only_managers=True), approve_country_message_callback.filter(), state="*")
+async def approve_country_message_handler(call: types.CallbackQuery, state: FSMContext = None):
+    data = await state.get_data() if state else {}
+    try:
+        await call.message.delete()
+    except Exception:
+        pass
 
     country_id = data.get("country_id")
     country = CountryLogics.get_by_id(country_id)
@@ -711,14 +743,22 @@ async def approve_country_message_handler(call: types.CallbackQuery, state: FSMC
     send_at = datetime.fromisoformat(send_at_str) if send_at_str else None
     manager = UserLogics.get_by_chat_id(call.from_user.id)
 
-    users = [u for u in UserLogics.get_country_list(country_id=country_id) if u.is_active and not u.is_blocked]
-    if not users:
-        await call.message.answer(f"🚫 No active users found in {country.name}.", reply_markup=manage_keyboard())
-        await state.finish()
+    if not text or not country_id:
+        await call.message.answer("⚠️ Message session expired. Please try sending again.", reply_markup=manage_keyboard())
+        if state:
+            await state.finish()
         return
 
-    await _execute_broadcast(call, manager, users, text, image_url, button_url, send_at, target_name=f"country {country.name}")
-    await state.finish()
+    users = [u for u in UserLogics.get_country_list(country_id=country_id) if u.is_active and not u.is_blocked]
+    if not users:
+        await call.message.answer(f"🚫 No active users found in {country.name if country else 'selected country'}.", reply_markup=manage_keyboard())
+        if state:
+            await state.finish()
+        return
+
+    await _execute_broadcast(call, manager, users, text, image_url, button_url, send_at, target_name=f"country {country.name if country else country_id}")
+    if state:
+        await state.finish()
 
 
 # ==================== BROADCAST TO COUNTRY + GROUP ====================
@@ -800,17 +840,24 @@ async def process_confirm_message_to_country_group(message: types.Message, state
     )
 
 
-@dp.callback_query_handler(UserFilter(only_managers=True), cancel_country_group_message_callback.filter(), state=SendMessageToCountryGroup.send_message)
-async def cancel_country_group_message_handler(call: types.CallbackQuery, state: FSMContext):
-    await call.message.delete()
+@dp.callback_query_handler(UserFilter(only_managers=True), cancel_country_group_message_callback.filter(), state="*")
+async def cancel_country_group_message_handler(call: types.CallbackQuery, state: FSMContext = None):
+    try:
+        await call.message.delete()
+    except Exception:
+        pass
     await call.message.answer("🚫 Broadcast cancelled.", reply_markup=manage_keyboard())
-    await state.finish()
+    if state:
+        await state.finish()
 
 
-@dp.callback_query_handler(UserFilter(only_managers=True), approve_country_group_message_callback.filter(), state=SendMessageToCountryGroup.send_message)
-async def approve_country_group_message_handler(call: types.CallbackQuery, state: FSMContext):
-    data = await state.get_data()
-    await call.message.delete()
+@dp.callback_query_handler(UserFilter(only_managers=True), approve_country_group_message_callback.filter(), state="*")
+async def approve_country_group_message_handler(call: types.CallbackQuery, state: FSMContext = None):
+    data = await state.get_data() if state else {}
+    try:
+        await call.message.delete()
+    except Exception:
+        pass
 
     country_id = data.get("country_id")
     group = data.get("group")
@@ -822,14 +869,22 @@ async def approve_country_group_message_handler(call: types.CallbackQuery, state
     send_at = datetime.fromisoformat(send_at_str) if send_at_str else None
     manager = UserLogics.get_by_chat_id(call.from_user.id)
 
-    users = [u for u in UserLogics.get_country_list(country_id=country_id, group=group) if u.is_active and not u.is_blocked]
-    if not users:
-        await call.message.answer(f"🚫 No active users found in {country.name} for group {group}.", reply_markup=manage_keyboard())
-        await state.finish()
+    if not text or not country_id or not group:
+        await call.message.answer("⚠️ Message session expired. Please try sending again.", reply_markup=manage_keyboard())
+        if state:
+            await state.finish()
         return
 
-    await _execute_broadcast(call, manager, users, text, image_url, button_url, send_at, target_name=f"{country.name} - group {group}")
-    await state.finish()
+    users = [u for u in UserLogics.get_country_list(country_id=country_id, group=group) if u.is_active and not u.is_blocked]
+    if not users:
+        await call.message.answer(f"🚫 No active users found in {country.name if country else 'country'} for group {group}.", reply_markup=manage_keyboard())
+        if state:
+            await state.finish()
+        return
+
+    await _execute_broadcast(call, manager, users, text, image_url, button_url, send_at, target_name=f"{country.name if country else country_id} - group {group}")
+    if state:
+        await state.finish()
 
 
 # ==================== BROADCAST TO ALL ====================
@@ -879,29 +934,43 @@ async def process_confirm_message_to_all_sending(message: types.Message, state: 
     )
 
 
-@dp.callback_query_handler(UserFilter(only_managers=True), cancel_all_message_callback.filter(), state=SendMessageToAll.send_message)
-async def cancel_all_message_handler(call: types.CallbackQuery, state: FSMContext):
-    await call.message.delete()
+@dp.callback_query_handler(UserFilter(only_managers=True), cancel_all_message_callback.filter(), state="*")
+async def cancel_all_message_handler(call: types.CallbackQuery, state: FSMContext = None):
+    try:
+        await call.message.delete()
+    except Exception:
+        pass
     await call.message.answer("🚫 Sending to all users cancelled.", reply_markup=manage_keyboard())
-    await state.finish()
+    if state:
+        await state.finish()
 
 
-@dp.callback_query_handler(UserFilter(only_managers=True), approve_all_message_callback.filter(), state=SendMessageToAll.send_message)
-async def approve_all_message_handler(call: types.CallbackQuery, state: FSMContext):
-    data = await state.get_data()
-    await call.message.delete()
+@dp.callback_query_handler(UserFilter(only_managers=True), approve_all_message_callback.filter(), state="*")
+async def approve_all_message_handler(call: types.CallbackQuery, state: FSMContext = None):
+    data = await state.get_data() if state else {}
+    try:
+        await call.message.delete()
+    except Exception:
+        pass
+
+    text = data.get("text")
+    if not text:
+        await call.message.answer("⚠️ Message session expired. Please try sending again.", reply_markup=manage_keyboard())
+        if state:
+            await state.finish()
+        return
 
     manager = UserLogics.get_by_chat_id(call.from_user.id)
     users = list(User.select(User.id, User.chat_id).where(User.is_active, ~User.is_blocked))
 
-    text = data.get("text")
     image_url = data.get("image_url")
     button_url = data.get("button_url")
     send_at_str = data.get("send_at")
     send_at = datetime.fromisoformat(send_at_str) if send_at_str else None
 
     await _execute_broadcast(call, manager, users, text, image_url, button_url, send_at, target_name="all users")
-    await state.finish()
+    if state:
+        await state.finish()
 
 
 # ==================== SEND BY CHAT ID ====================
@@ -971,20 +1040,33 @@ async def process_confirm_sending_by_chat_id(message: types.Message, state: FSMC
     )
 
 
-@dp.callback_query_handler(UserFilter(only_managers=True), cancel_by_chat_id_message_callback.filter(), state=SendMessageToOne.send_message)
-async def cancel_one_message_handler(call: types.CallbackQuery, state: FSMContext):
-    await call.message.delete()
+@dp.callback_query_handler(UserFilter(only_managers=True), cancel_by_chat_id_message_callback.filter(), state="*")
+async def cancel_one_message_handler(call: types.CallbackQuery, state: FSMContext = None):
+    try:
+        await call.message.delete()
+    except Exception:
+        pass
     await call.message.answer("🚫 Sending to user cancelled.", reply_markup=manage_keyboard())
-    await state.finish()
+    if state:
+        await state.finish()
 
 
-@dp.callback_query_handler(UserFilter(only_managers=True), approve_by_chat_id_message_callback.filter(), state=SendMessageToOne.send_message)
-async def approve_one_message_handler(call: types.CallbackQuery, state: FSMContext):
-    data = await state.get_data()
-    await call.message.delete()
+@dp.callback_query_handler(UserFilter(only_managers=True), approve_by_chat_id_message_callback.filter(), state="*")
+async def approve_one_message_handler(call: types.CallbackQuery, state: FSMContext = None):
+    data = await state.get_data() if state else {}
+    try:
+        await call.message.delete()
+    except Exception:
+        pass
 
     recipient_chat_id = data.get("recipient_chat_id")
     text = data.get("text")
+    if not recipient_chat_id or not text:
+        await call.message.answer("⚠️ Message session expired. Please try sending again.", reply_markup=manage_keyboard())
+        if state:
+            await state.finish()
+        return
+
     image_url = data.get("image_url")
     button_url = data.get("button_url")
     send_at_str = data.get("send_at")
@@ -993,7 +1075,8 @@ async def approve_one_message_handler(call: types.CallbackQuery, state: FSMConte
     user = UserLogics.get_by_chat_id(recipient_chat_id)
     if not user or not user.is_active or user.is_blocked:
         await call.message.answer("🚫 Target user is not active or is blocked.", reply_markup=manage_keyboard())
-        await state.finish()
+        if state:
+            await state.finish()
         return
 
     manager = UserLogics.get_by_chat_id(call.from_user.id)
@@ -1008,7 +1091,11 @@ async def approve_one_message_handler(call: types.CallbackQuery, state: FSMConte
     else:
         try:
             if image_url:
-                await bot.send_photo(chat_id=recipient_chat_id, photo=image_url, caption=text, reply_markup=reply_markup, parse_mode="HTML")
+                try:
+                    await bot.send_photo(chat_id=recipient_chat_id, photo=image_url, caption=text, reply_markup=reply_markup, parse_mode="HTML")
+                except Exception as img_err:
+                    logging.warning(f"Failed to send photo to {recipient_chat_id}, falling back to text: {img_err}")
+                    await bot.send_message(chat_id=recipient_chat_id, text=text, reply_markup=reply_markup, parse_mode="HTML", disable_web_page_preview=True)
             else:
                 await bot.send_message(chat_id=recipient_chat_id, text=text, reply_markup=reply_markup, parse_mode="HTML", disable_web_page_preview=True)
             await call.message.answer("✅ Message sent successfully.", reply_markup=manage_keyboard())
@@ -1020,7 +1107,8 @@ async def approve_one_message_handler(call: types.CallbackQuery, state: FSMConte
             logging.error(f"Failed to send to {recipient_chat_id}: {e}")
             await call.message.answer("🚨 Unexpected error occurred.", reply_markup=manage_keyboard())
 
-    await state.finish()
+    if state:
+        await state.finish()
 
 
 # ==================== HELPER BROADCAST EXECUTION ====================
@@ -1049,7 +1137,11 @@ async def _execute_broadcast(call, manager, users, text, image_url, button_url, 
                 return
             try:
                 if image_url:
-                    await bot.send_photo(u.chat_id, image_url, caption=text, reply_markup=reply_markup, parse_mode="HTML")
+                    try:
+                        await bot.send_photo(u.chat_id, image_url, caption=text, reply_markup=reply_markup, parse_mode="HTML")
+                    except Exception as img_err:
+                        logging.warning(f"Failed to send photo to {u.chat_id}, falling back to text: {img_err}")
+                        await bot.send_message(u.chat_id, text, reply_markup=reply_markup, parse_mode="HTML", disable_web_page_preview=True)
                 else:
                     await bot.send_message(u.chat_id, text, reply_markup=reply_markup, parse_mode="HTML", disable_web_page_preview=True)
                 success += 1

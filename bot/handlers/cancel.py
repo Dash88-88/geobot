@@ -11,14 +11,15 @@ from logics import UserLogics, CountryLogics
 
 
 @dp.message_handler(Command("cancel"), state="*")
-@dp.message_handler(Text([DefaultKeyboardButtons.Cancel.value, "⬅️ Cancel", "‍⬅️ Cancel", "Cancel", "Отмена"], ignore_case=True), state="*")
+@dp.message_handler(Text([DefaultKeyboardButtons.Cancel.value, "⬅️ Cancel", "‍⬅️ Cancel", "Cancel"], ignore_case=True), state="*")
 @dp.callback_query_handler(text=CallbackQueryTypes.Cancel.value, state='*')
 async def cancel_from_callback(update: types.Message or types.CallbackQuery, state: FSMContext):
     user_id = update.from_user.id
     user = UserLogics.get_by_chat_id(user_id)
 
     if user and not user.is_manager:
-        has_valid_country = bool(user.country and user.country.is_active and not user.country.is_removed)
+        country = UserLogics.get_safe_country(user)
+        has_valid_country = bool(country and country.is_active and not country.is_removed)
         if not has_valid_country:
             active_countries = CountryLogics.get_list(is_active=True, is_removed=False)
             if active_countries:
@@ -44,15 +45,23 @@ async def cancel_from_callback(update: types.Message or types.CallbackQuery, sta
                 await update.answer()
             return
 
+    current_state = await state.get_state() if state else None
     if state:
         await state.finish()
 
+    is_manager = bool(user and user.is_manager)
+    if is_manager and current_state:
+        keyboard = manage_keyboard()
+    else:
+        keyboard = main_menu_keyboard(is_manager=is_manager)
+
     if isinstance(update, types.Message):
         message = update
-        keyboard = manage_keyboard() if user and user.is_manager else main_menu_keyboard()
         await message.answer("Action canceled.", reply_markup=keyboard)
     elif isinstance(update, types.CallbackQuery):
-        keyboard = manage_keyboard() if user and user.is_manager else main_menu_keyboard()
         await update.message.answer("Action canceled.", reply_markup=keyboard)
-        await update.message.delete()
+        try:
+            await update.message.delete()
+        except Exception:
+            pass
         await update.answer()

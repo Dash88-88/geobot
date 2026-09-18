@@ -2,7 +2,7 @@ import logging
 from asyncio import sleep
 from aiogram import types
 from aiogram.dispatcher import FSMContext
-from aiogram.dispatcher.filters import Text
+from aiogram.dispatcher.filters.builtin import Command, Text
 from aiogram.types import ContentType, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from bot.filters import UserFilter
 from bot.keyboards.callback_datas import (
@@ -47,7 +47,7 @@ from common.exceptions import (
     UserAlreadyPositiveError,
     UserAlreadyVipError,
 )
-from config import COMMUNITY_URL, REGISTRATION_URL, USERS_PER_PAGE, BONUS_TRANSFER_URL
+from config import COMMUNITY_URL, REGISTRATION_URL, USERS_PER_PAGE, BONUS_TRANSFER_URL, BOT_ADMINS
 from logics import UserLogics
 from models import User
 from html import escape as html_escape
@@ -68,11 +68,13 @@ async def _send_user_info(message: types.Message, user_id: str):
         if ref_user:
             source = str(ref_user.chat_id)
 
-    country_name = user.country.name if user.country else "None (Global)"
+    country = UserLogics.get_safe_country(user)
+    country_name = country.name if country else "None (Global)"
+    user_display = html_escape(user.username if user.username else (user.nickname or str(user.chat_id)))
 
     await message.answer(
         f"<pre>{user.chat_id}</pre>\n"
-        f"🔗: {user.username if user.username else user.nickname}, 🃏: <b>{site_id_text}</b>\n"
+        f"🔗: {user_display}, 🃏: <b>{site_id_text}</b>\n"
         f"🌍: <b>{country_name}</b>\n"
         f"📣: <b>{'✅ Subscribed' if user_subscribed else '📛 Not subscribed!'}</b>\n"
         f"⚖️: <b>Referrals:</b> {referrals_count}\n"
@@ -361,21 +363,41 @@ async def process_set_user_negative(call: types.CallbackQuery, callback_data: di
     await _send_user_info(call.message, opened_user_id)
 
 
-@dp.message_handler(Text(DefaultKeyboardButtons.Profile.value), UserFilter())
-async def process_open_profile(message: types.Message):
+@dp.message_handler(Command(["profile"]), UserFilter(), state="*")
+@dp.message_handler(
+    Text([
+        DefaultKeyboardButtons.Profile.value,
+        "🤴🏻 Profile",
+        "🤴 Profile",
+        "Profile"
+    ], ignore_case=True),
+    UserFilter(),
+    state="*"
+)
+async def process_open_profile(message: types.Message, state: FSMContext = None):
+    if state:
+        await state.finish()
     user = UserLogics.get_by_chat_id(message.from_user.id)
     if not user:
-        return
+        user = UserLogics.create(
+            chat_id=message.from_user.id,
+            username=message.from_user.username,
+            nickname=message.from_user.username or message.from_user.first_name or str(message.from_user.id),
+            site_id='',
+            is_manager=bool(message.from_user.id in BOT_ADMINS)
+        )
 
     user_subscribed = await UserLogics.is_subscriber(bot=bot, chat_id=message.from_user.id, user=user)
 
-    channel_url = (user.country.channel_url if user.country and user.country.channel_url else COMMUNITY_URL) or "https://t.me"
+    country = UserLogics.get_safe_country(user)
+    channel_url = (country.channel_url if country and country.channel_url else COMMUNITY_URL) or "https://t.me"
     channel_str_link = f"<a href='{channel_url}'>Channel</a>"
-    country_name = user.country.name if user.country else "Not selected"
+    country_name = country.name if country else "Not selected"
     site_id_text = html_escape(user.site_id) if user.site_id else "📛 Not specified"
+    display_name = html_escape(user.nickname or user.username or "User")
 
     await message.answer(
-        f"🌟 <b>Profile:</b> {user.nickname if user.nickname else user.username}\n"
+        f"🌟 <b>Profile:</b> {display_name}\n"
         f"🌍 <b>Country:</b> {country_name}\n"
         f"🃏 <b>Site ID / Nickname:</b> {site_id_text}\n"
         f"📣 <b>Status:</b> {'✅ Subscribed' if user_subscribed else f'📛 Please subscribe to our {channel_str_link}'}",
@@ -401,6 +423,29 @@ async def process_user_request_update_site_id(call: types.CallbackQuery, state: 
 @dp.message_handler(state=UpdateSiteID.send_site_id, content_types=(ContentType.TEXT,))
 async def process_confirm_update_site_id(message: types.Message, state: FSMContext):
     site_id = message.text.strip()
+
+    # Guard against capturing menu buttons as Site ID
+    menu_buttons = [b.value for b in DefaultKeyboardButtons]
+    if site_id in menu_buttons or site_id.lower() in [
+        "/cancel", "cancel",
+        "/profile", "profile",
+        "/bonuses", "bonuses",
+        "/invite", "invite"
+    ]:
+        await state.finish()
+        if any(c in site_id.lower() for c in ["cancel"]):
+            user = UserLogics.get_by_chat_id(message.from_user.id)
+            keyboard = manage_keyboard() if user and user.is_manager else main_menu_keyboard()
+            await message.answer("Action canceled.", reply_markup=keyboard)
+            return
+        if any(p in site_id.lower() for p in ["profile", "🤴"]):
+            await process_open_profile(message, state)
+            return
+        user = UserLogics.get_by_chat_id(message.from_user.id)
+        keyboard = manage_keyboard() if user and user.is_manager else main_menu_keyboard()
+        await message.answer("Site ID update was canceled.", reply_markup=keyboard)
+        return
+
     if not site_id or len(site_id) > 100 or '\n' in site_id:
         await message.answer(
             "⚠️ Invalid input. Please enter a valid Site ID or Nickname (single line, up to 100 characters):",
@@ -438,12 +483,13 @@ async def process_confirm_update_site_id(message: types.Message, state: FSMConte
         except Exception as e:
             logging.warning(f"Could not send onboarding photo: {e}")
 
-        country_name = user.country.name if user and user.country else "Unknown"
+        country = UserLogics.get_safe_country(user)
+        country_name = country.name if country else "Unknown"
         await message.answer(
             f"✅ <b>Registration complete!</b>\n"
             f"🌍 Country: <b>{country_name}</b>\n"
             f"🃏 Site ID / Nickname: <b>{html_escape(site_id)}</b>\n\n"
-            f"Welcome, {message.from_user.first_name or user.nickname or 'friend'} 👋!",
+            f"Welcome, {html_escape(message.from_user.first_name or (user.nickname if user else '') or 'friend')} 👋!",
             reply_markup=main_menu_keyboard(),
             parse_mode="HTML"
         )

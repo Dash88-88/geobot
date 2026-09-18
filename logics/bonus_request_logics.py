@@ -40,7 +40,7 @@ class BonusRequestLogics:
             fresh_request.save(only=(BonusRequest.status,))
 
     @classmethod
-    def cancel(cls, bonus_request: BonusRequest) -> None:
+    def cancel(cls, bonus_request: BonusRequest, reject_reason: str = None) -> None:
         with db.atomic():
             fresh_request = cls.get_by_id(bonus_request.id)
             if not fresh_request:
@@ -49,7 +49,10 @@ class BonusRequestLogics:
                 raise BonusAlreadyCanceledError()
             
             fresh_request.status = BonusRequestStatuses.Canceled.value
-            fresh_request.save(only=(BonusRequest.status,))
+            fresh_request.reject_reason = reject_reason
+            fresh_request.save(only=(BonusRequest.status, BonusRequest.reject_reason))
+            bonus_request.status = fresh_request.status
+            bonus_request.reject_reason = fresh_request.reject_reason
 
     @classmethod
     def activate(cls, bonus_request: BonusRequest) -> None:
@@ -61,7 +64,10 @@ class BonusRequestLogics:
                 raise BonusAlreadyActivatedError()
             
             fresh_request.status = BonusRequestStatuses.Active.value
-            fresh_request.save(only=(BonusRequest.status,))
+            fresh_request.reject_reason = None
+            fresh_request.save(only=(BonusRequest.status, BonusRequest.reject_reason))
+            bonus_request.status = fresh_request.status
+            bonus_request.reject_reason = None
 
     @classmethod
     def get_by_id(cls, pk: str) -> BonusRequest:

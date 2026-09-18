@@ -24,9 +24,10 @@ class BonusLogics:
         return Bonus.select()
 
     @classmethod
-    def create(cls, description: str, group: str = Groups.All.value, country: Optional[Country] = None, is_active: bool = False, is_request: bool = True) -> Bonus:
+    def create(cls, description: str, group: str = Groups.All.value, country: Optional[Country] = None, is_active: bool = False, is_request: bool = True, photo_url: str = '') -> Bonus:
         bonus = Bonus.create(
             description=description,
+            photo_url=photo_url or '',
             group=group,
             country=country,
             is_active=is_active,
@@ -177,3 +178,19 @@ class BonusLogics:
     @classmethod
     def set_group_vip(cls, bonus: Bonus):
         cls.set_group(bonus, Groups.Vip.value)
+
+    @classmethod
+    def update_description(cls, bonus: Bonus, description: str) -> None:
+        if not bonus:
+            raise ValueError("Bonus cannot be None")
+        with bonus._meta.database.atomic():
+            bonus.description = description.strip()
+            bonus.save(only=(Bonus.description,))
+
+    @classmethod
+    def update_photo_url(cls, bonus: Bonus, photo_url: str) -> None:
+        if not bonus:
+            raise ValueError("Bonus cannot be None")
+        with bonus._meta.database.atomic():
+            bonus.photo_url = photo_url.strip() if photo_url else ''
+            bonus.save(only=(Bonus.photo_url,))

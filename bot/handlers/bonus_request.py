@@ -36,6 +36,7 @@ from common.constants import (
     bonus_request_icon_dict,
     DefaultInlineButtons,
     BonusRequestRejectReasons,
+    get_reject_reason_text,
     Groups,
 )
 from common.exceptions import (
@@ -74,9 +75,10 @@ async def _send_bonus_request_info(user_id: str or int, bonus_request_id: str, b
         subscribed_text = '🟢 <b>Subscribed</b>' if user_subscribed else '🔴 <b>Not subscribed</b>'
         request_creation_date = f'<i>{bonus_request.created_at.strftime(DATETIME_FORMAT)}</i>'
 
+        reject_reason_text = f"\n<b>❌ Reject Reason:</b> {bonus_request.reject_reason}" if bonus_request.reject_reason else ""
         request_text_data = (
             f"<b>📝 Request:</b> <i>{request_creation_date}</i>\n"
-            f"<b>Status:</b> {bonus_request_icon_dict.get(bonus_request.status)}\n\n"
+            f"<b>Status:</b> {bonus_request_icon_dict.get(bonus_request.status)}{reject_reason_text}\n\n"
             f"<b>{bonus_group_icon[0]} Bonus ID:</b> {bonus_id}\n"
             f"<b>📄 Bonus text:</b>\n{bonus.description}\n"
             f"<b>{user_group_icon[0]} User ID:</b> <code>{bonus_user.chat_id}</code>\n"
@@ -85,8 +87,9 @@ async def _send_bonus_request_info(user_id: str or int, bonus_request_id: str, b
             f"{subscribed_text}"
         )
     else:
+        reject_reason_text = f"\n<b>❌ Reason:</b> {bonus_request.reject_reason}" if bonus_request.status == BonusRequestStatuses.Canceled.value and bonus_request.reject_reason else ""
         request_text_data = (
-            f"<b>🚀 Request is: {bonus_request_icon_dict.get(bonus_request.status)}</b>\n\n"
+            f"<b>🚀 Request is: {bonus_request_icon_dict.get(bonus_request.status)}</b>{reject_reason_text}\n\n"
             f"<b>🎁 Bonus:</b>\n{bonus.description}"
         )
 
@@ -134,9 +137,6 @@ async def _send_bonus_request_info(user_id: str or int, bonus_request_id: str, b
 
 @dp.callback_query_handler(bonus_already_requested_callback.filter(), UserFilter())
 async def process_bonus_already_requested(call: types.CallbackQuery, callback_data: dict):
-    await call.message.answer(
-        f"A request for this bonus already exists 🏁\nCheck the status in {DefaultKeyboardButtons.BonusRequests.value}"
-    )
     bonus_id = callback_data.get('bonus_id')
     bonus = BonusLogics.get_by_id(bonus_id)
     if not bonus:
@@ -146,11 +146,21 @@ async def process_bonus_already_requested(call: types.CallbackQuery, callback_da
     if not user:
         return
 
-    requests = BonusRequestLogics.get_list(user_id=user.id, bonus_id=bonus.id)
-    if not requests:
+    all_requests = BonusRequestLogics.get_list(user_id=user.id, bonus_id=bonus.id)
+    active_or_approved = [
+        r for r in all_requests
+        if r.status in (BonusRequestStatuses.Active.value, BonusRequestStatuses.Approved.value)
+    ]
+    if not active_or_approved:
+        from bot.handlers.bonus import _send_bonus_info
+        await call.message.delete()
+        await _send_bonus_info(user_id=user.chat_id, bonus_id=bonus.id, is_requested=False)
         return
 
-    bonus_request = requests[0]
+    bonus_request = active_or_approved[0]
+    await call.message.answer(
+        f"A request for this bonus already exists 🏁\nCheck the status in {DefaultKeyboardButtons.BonusRequests.value}"
+    )
     await sleep(0.2)
     await call.message.delete()
     await _send_bonus_request_info(
@@ -272,11 +282,12 @@ async def process_activate_br_cancel(call: types.CallbackQuery, callback_data: d
 
 @dp.callback_query_handler(cancel_bonus_request_callback.filter(), UserFilter(only_managers=True))
 async def process_cancel_bonus_request(call: types.CallbackQuery, callback_data: dict):
-    await call.message.delete()
     bonus_request_id = callback_data.get('bonus_request_id')
+    markup = cancel_bonus_request_options_keyboard(bonus_request_id=bonus_request_id)
+    await call.message.delete()
     await call.message.answer(
         "Select reject reason to cancel the request? 👉",
-        reply_markup=cancel_bonus_request_options_keyboard(bonus_request_id=bonus_request_id)
+        reply_markup=markup
     )
 
 
@@ -287,14 +298,15 @@ async def process_cancel_br_approve(call: types.CallbackQuery, callback_data: di
     user = UserLogics.get_by_chat_id(call.from_user.id)
     user_chat_id = bonus_request.user.chat_id
     canceled = False
+    reason_text = "Your request was rejected."
     try:
-        BonusRequestLogics.cancel(bonus_request)
+        BonusRequestLogics.cancel(bonus_request, reject_reason=reason_text)
         canceled = True
         await call.message.answer('The request has been canceled ❌', reply_markup=manage_keyboard())
         await bot.send_message(
             chat_id=int(user_chat_id),
             text=f"⚠️ Your bonus request status is: {bonus_request_icon_dict.get(BonusRequestStatuses.Canceled.value)}\n"
-                 f"<i>Reason: No specific reason given.</i>",
+                 f"<i>Reason: {reason_text}</i>",
             parse_mode="HTML"
         )
     except BonusAlreadyCanceledError:
@@ -324,11 +336,11 @@ async def process_cancel_br_approve_opt(call: types.CallbackQuery, callback_data
     user = UserLogics.get_by_chat_id(call.from_user.id)
     user_chat_id = bonus_request.user.chat_id
     canceled = False
+    reason_text = get_reject_reason_text(reject_reason)
     try:
-        BonusRequestLogics.cancel(bonus_request)
+        BonusRequestLogics.cancel(bonus_request, reject_reason=reason_text)
         canceled = True
         await call.message.answer('The request has been canceled ❌', reply_markup=manage_keyboard())
-        reason_text = BonusRequestRejectReasons.get(reject_reason, reject_reason)
         await bot.send_message(
             chat_id=int(user_chat_id),
             text=f"⚠️ Your bonus request status is: {bonus_request_icon_dict.get(BonusRequestStatuses.Canceled.value)}\n"
@@ -402,6 +414,12 @@ async def process_approve_br_approve(call: types.CallbackQuery, callback_data: d
         bonus_id=bonus_request.bonus_id,
         bonus_request_id=bonus_request.id
     )
+    await sleep(0.2)
+    await _send_bonus_request_info(
+        user_id=user_chat_id,
+        bonus_id=bonus_request.bonus_id,
+        bonus_request_id=bonus_request.id
+    )
 
 
 @dp.callback_query_handler(approve_br_cancel_callback.filter(), UserFilter(only_managers=True))
@@ -432,9 +450,16 @@ async def process_request_bonus(call: types.CallbackQuery, callback_data: dict):
         return
 
     bonus_requests = BonusRequestLogics.get_list(user_id=user.id, bonus_id=bonus_id)
-    if len(bonus_requests):
-        bonus_request = bonus_requests[0]
-        await call.message.answer("A request for this bonus already exists 🏁", reply_markup=main_menu_keyboard())
+    active_or_approved = [
+        r for r in bonus_requests
+        if r.status in (BonusRequestStatuses.Active.value, BonusRequestStatuses.Approved.value)
+    ]
+    if active_or_approved:
+        bonus_request = active_or_approved[0]
+        if bonus_request.status == BonusRequestStatuses.Approved.value:
+            await call.message.answer("This bonus has already been claimed by your account ✅", reply_markup=main_menu_keyboard())
+        else:
+            await call.message.answer("A request for this bonus already exists 🏁", reply_markup=main_menu_keyboard())
         await sleep(0.2)
         await call.message.delete()
         await _send_bonus_request_info(

@@ -112,6 +112,9 @@ class DefaultKeyboardButtons(Enum):
     ViewUser = "🔍 Find User"
     ViewUsersPerGroup = "👥 Users by Group"
 
+    UserMenu = "👤 User Menu"
+    AdminPanel = "🛠️ Admin Panel"
+
     Cancel = "⬅️ Cancel"
 
 
@@ -119,12 +122,35 @@ class InlineQueryTypes(Enum):
     Invite = 'invite'
 
 
+BonusRequestRejectReasonTitles = {
+    "inv_id": "Invalid Site ID / Nickname",
+    "no_sub": "No subscription",
+    "already_rec": "Already Received",
+    "just_rej": "Just Reject"
+}
+
 BonusRequestRejectReasons = {
+    "inv_id": "Your profile Site ID / Nickname is not valid.",
+    "no_sub": "You are not subscribed to our channel.",
+    "already_rec": "This bonus has already been claimed by your account.",
+    "just_rej": "Your request was rejected.",
     "Invalid Site ID / Nickname": "Your profile Site ID / Nickname is not valid.",
+    "Invalid Site ID": "Your profile Site ID / Nickname is not valid.",
     "No subscription": "You are not subscribed to our channel.",
     "Already Received": "This bonus has already been claimed by your account.",
     "Just Reject": "Your request was rejected."
 }
+
+
+def get_reject_reason_text(code_or_title: str) -> str:
+    if not code_or_title:
+        return "Your request was rejected."
+    if code_or_title in BonusRequestRejectReasons:
+        return BonusRequestRejectReasons[code_or_title]
+    for code, title in BonusRequestRejectReasonTitles.items():
+        if code_or_title == title:
+            return BonusRequestRejectReasons[code]
+    return code_or_title
 
 
 class CallbackQueryTypes(Enum):
@@ -181,7 +207,7 @@ class CallbackQueryTypes(Enum):
     CancelBonusRequestCancel = "cancel_bonus_request_cancel"
     BonusRequestStatusFilter = "bonus_request_status_filter"
     OpenBonusRequestStatusFilter = "open_bonus_request_status_filter"
-    ApproveBonusRequestCancelOpt = "approve_br_cancel_opt"
+    ApproveBonusRequestCancelOpt = "c_br_opt"
     OpenUser = "open_user"
     DisableBonus = "disable_bonus"
     EnableBonus = "enable_bonus"

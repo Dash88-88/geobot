@@ -1,13 +1,17 @@
 from aiogram import types
-from aiogram.dispatcher.filters.builtin import CommandHelp, Text
+from aiogram.dispatcher import FSMContext
+from aiogram.dispatcher.filters.builtin import CommandHelp, Command, Text
 from bot.keyboards.default import main_menu_keyboard
 from bot.keyboards.inline import bonus_transfer_inline_button_keyboard
 from bot.loader import dp
 from common.constants import DefaultKeyboardButtons
 
 
-@dp.message_handler(CommandHelp())
-async def process_faq(message: types.Message):
+@dp.message_handler(CommandHelp(), state="*")
+@dp.message_handler(Command(["help", "faq"]), state="*")
+async def process_faq(message: types.Message, state: FSMContext = None):
+    if state:
+        await state.finish()
     await message.answer(
         "👋 <b>How to use the bot:</b>\n\n"
         "• <b>🎁 Bonuses:</b> View active promotions and request bonuses.\n"
@@ -19,7 +23,16 @@ async def process_faq(message: types.Message):
     )
 
 
-@dp.message_handler(Text(DefaultKeyboardButtons.BonusTransfer.value))
-async def process_bonus_transfer(message: types.Message):
+@dp.message_handler(
+    Text([
+        DefaultKeyboardButtons.BonusTransfer.value,
+        "🧧 Welcome Bonus",
+        "Welcome Bonus"
+    ], ignore_case=True),
+    state="*"
+)
+async def process_bonus_transfer(message: types.Message, state: FSMContext = None):
+    if state:
+        await state.finish()
     await message.answer("Claim your Welcome Bonus 👉",
                          reply_markup=bonus_transfer_inline_button_keyboard())

@@ -195,7 +195,7 @@ async def send_bonuses_page(message=None, call=None, user=None, page=1):
         return
 
     for bonus in bonuses:
-        is_requested = bool(len(BonusRequestLogics.get_list(user_id=user.id, bonus_id=bonus.id)))
+        is_requested = bool(len([r for r in BonusRequestLogics.get_list(user_id=user.id, bonus_id=bonus.id) if r.status in (BonusRequestStatuses.Active.value, BonusRequestStatuses.Approved.value)]))
         await _send_bonus_info(
             user_id=user.chat_id,
             bonus_id=bonus.id,
@@ -215,10 +215,9 @@ async def send_bonuses_page(message=None, call=None, user=None, page=1):
         DefaultKeyboardButtons.Bonuses.value,
         DefaultKeyboardButtons.AllBonuses.value,
         "🎁 Bonuses",
+        "Bonuses",
         "🔍 All Bonuses",
-        "🔍 🎁",
-        "Бонусы",
-        "Все бонусы"
+        "🔍 🎁"
     ], ignore_case=True),
     UserFilter(),
     state="*"
@@ -510,7 +509,7 @@ async def process_confirm_bonus_image_url(message: types.Message, state: FSMCont
         return
 
     # Check for clearing
-    if raw_text.lower() in ("-", "clear", "none", "del", "delete", "0", "удалить", "очистить"):
+    if raw_text.lower() in ("-", "clear", "none", "del", "delete", "0"):
         await state.finish()
         bonus.photo_url = ""
         bonus.save(only=(Bonus.photo_url,))

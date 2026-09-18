@@ -12,6 +12,7 @@ from bot.states import UpdateSiteID
 from common.constants import BuiltInReferralSources, DefaultInlineButtons
 from config import BOT_ADMINS, BONUS_TRANSFER_URL, REGISTRATION_URL
 from logics import UserLogics, CountryLogics
+from html import escape as html_escape
 
 
 @dp.message_handler(CommandStart(), state="*")
@@ -41,7 +42,8 @@ async def process_start(message: types.Message, state: FSMContext = None):
         )
 
     # Check country requirement
-    has_valid_country = bool(user.country and user.country.is_active and not user.country.is_removed)
+    country = UserLogics.get_safe_country(user)
+    has_valid_country = bool(country and country.is_active and not country.is_removed)
 
     if not has_valid_country:
         active_countries = CountryLogics.get_list(is_active=True, is_removed=False)
@@ -71,7 +73,7 @@ async def process_start(message: types.Message, state: FSMContext = None):
         await UpdateSiteID.send_site_id.set()
         reg_link = f"\n\nDon't have an account yet? Register <a href='{REGISTRATION_URL}'>HERE</a>" if REGISTRATION_URL else ""
         await message.answer(
-            f"🌍 Country: <b>{user.country.name}</b>\n\n"
+            f"🌍 Country: <b>{country.name}</b>\n\n"
             f"🃏 <b>Please enter your Site ID / Nickname:</b>\n"
             f"<i>Without Site ID / Nickname, you will not be able to use the bot and request bonuses.</i>"
             f"{reg_link}",
@@ -99,9 +101,10 @@ async def process_start(message: types.Message, state: FSMContext = None):
     except Exception as e:
         logging.warning(f"Could not send start photo: {e}")
 
+    welcome_name = html_escape(user.nickname or user.username or 'friend')
     await message.answer(
-        text=f"Welcome back, {user.nickname or 'friend'} 👋!\n🌍 Country: <b>{user.country.name}</b>",
-        reply_markup=main_menu_keyboard() if not user.is_manager else manage_keyboard(),
+        text=f"Welcome back, {welcome_name} 👋!\n🌍 Country: <b>{country.name}</b>",
+        reply_markup=main_menu_keyboard(is_manager=bool(user and user.is_manager)),
         parse_mode="HTML"
     )
 
