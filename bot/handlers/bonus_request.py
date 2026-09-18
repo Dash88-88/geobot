@@ -286,12 +286,16 @@ async def process_cancel_br_approve(call: types.CallbackQuery, callback_data: di
     bonus_request = BonusRequestLogics.get_by_id(bonus_request_id)
     user = UserLogics.get_by_chat_id(call.from_user.id)
     user_chat_id = bonus_request.user.chat_id
+    canceled = False
     try:
         BonusRequestLogics.cancel(bonus_request)
+        canceled = True
         await call.message.answer('The request has been canceled ❌', reply_markup=manage_keyboard())
         await bot.send_message(
             chat_id=int(user_chat_id),
-            text=f"⚠️ Your bonus request status is: {bonus_request_icon_dict.get(BonusRequestStatuses.Canceled.value)}"
+            text=f"⚠️ Your bonus request status is: {bonus_request_icon_dict.get(BonusRequestStatuses.Canceled.value)}\n"
+                 f"<i>Reason: No specific reason given.</i>",
+            parse_mode="HTML"
         )
     except BonusAlreadyCanceledError:
         await call.message.answer("Ups, the request is already canceled 🤭", reply_markup=manage_keyboard())
@@ -303,6 +307,13 @@ async def process_cancel_br_approve(call: types.CallbackQuery, callback_data: di
         bonus_id=bonus_request.bonus_id,
         bonus_request_id=bonus_request.id
     )
+    if canceled:
+        await sleep(0.2)
+        await _send_bonus_request_info(
+            user_id=user_chat_id,
+            bonus_id=bonus_request.bonus_id,
+            bonus_request_id=bonus_request.id
+        )
 
 
 @dp.callback_query_handler(cancel_br_approve_opt_callback.filter(), UserFilter(only_managers=True))
@@ -312,8 +323,10 @@ async def process_cancel_br_approve_opt(call: types.CallbackQuery, callback_data
     bonus_request = BonusRequestLogics.get_by_id(bonus_request_id)
     user = UserLogics.get_by_chat_id(call.from_user.id)
     user_chat_id = bonus_request.user.chat_id
+    canceled = False
     try:
         BonusRequestLogics.cancel(bonus_request)
+        canceled = True
         await call.message.answer('The request has been canceled ❌', reply_markup=manage_keyboard())
         reason_text = BonusRequestRejectReasons.get(reject_reason, reject_reason)
         await bot.send_message(
@@ -332,6 +345,13 @@ async def process_cancel_br_approve_opt(call: types.CallbackQuery, callback_data
         bonus_id=bonus_request.bonus_id,
         bonus_request_id=bonus_request.id
     )
+    if canceled:
+        await sleep(0.2)
+        await _send_bonus_request_info(
+            user_id=user_chat_id,
+            bonus_id=bonus_request.bonus_id,
+            bonus_request_id=bonus_request.id
+        )
 
 
 @dp.callback_query_handler(cancel_br_cancel_callback.filter(), UserFilter(only_managers=True))
