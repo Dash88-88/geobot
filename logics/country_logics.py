@@ -24,13 +24,35 @@ class CountryLogics:
             return f"-100{cid[1:]}"
         return cid
 
+    @staticmethod
+    def _normalize_channel_url(channel_url: str) -> str:
+        if not channel_url:
+            return ''
+        url = str(channel_url).strip()
+        if url in ('-', 'None', 'null', 'none'):
+            return ''
+        if url.startswith('@'):
+            return f"https://t.me/{url[1:]}"
+        if url.startswith('t.me/'):
+            return f"https://{url}"
+        if url.startswith('telegram.me/'):
+            return f"https://{url}"
+        if not (url.startswith('http://') or url.startswith('https://') or url.startswith('tg://')):
+            if url.startswith('+') or url.startswith('joinchat/'):
+                return f"https://t.me/{url}"
+            elif '.' in url:
+                return f"https://{url}"
+            else:
+                return f"https://t.me/{url}"
+        return url
+
     @classmethod
     def create(cls, name: str, code: str, channel_id: str = '', channel_url: str = '', is_active: bool = True) -> Country:
         country = Country.create(
             name=name.strip(),
             code=code.strip().upper(),
             channel_id=cls._normalize_channel_id(channel_id),
-            channel_url=channel_url.strip() if channel_url else '',
+            channel_url=cls._normalize_channel_url(channel_url),
             is_active=is_active,
             is_removed=False
         )
@@ -112,7 +134,7 @@ class CountryLogics:
             country.channel_id = cls._normalize_channel_id(channel_id)
             fields_to_update.append(Country.channel_id)
         if channel_url is not None:
-            country.channel_url = channel_url.strip()
+            country.channel_url = cls._normalize_channel_url(channel_url)
             fields_to_update.append(Country.channel_url)
 
         if fields_to_update:

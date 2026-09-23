@@ -451,9 +451,13 @@ def disable_bonus_confirmation_keyboard(bonus_id: str):
 
 
 def community_keyboard(url: str):
+    target_url = (url or "").strip()
+    if target_url and not target_url.startswith(("http://", "https://", "tg://")):
+        target_url = f"https://{target_url}"
+    target_url = target_url or "https://t.me"
     return InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text=DefaultInlineButtons.EnterCommunity.value, url=url),
+            InlineKeyboardButton(text=DefaultInlineButtons.EnterCommunity.value, url=target_url),
         ]
     ])
 
@@ -472,8 +476,12 @@ def profile_keyboard():
 
 
 def message_inline_button_keyboard(button_url: str):
+    target_url = (button_url or "").strip()
+    if target_url and not target_url.startswith(("http://", "https://", "tg://")):
+        target_url = f"https://{target_url}"
+    target_url = target_url or "https://t.me"
     return InlineKeyboardMarkup().add(
-        InlineKeyboardButton(text=DefaultInlineButtons.LearMore.value, url=button_url.strip())
+        InlineKeyboardButton(text=DefaultInlineButtons.LearMore.value, url=target_url)
     )
 
 

@@ -323,6 +323,40 @@ class TestAllButtonsAndHandlers(unittest.TestCase):
             self.assertNotIn(self.admin.chat_id, sent_chats)
             self.assertIn(self.user.chat_id, sent_chats)
 
+    def test_15_admin_create_country_with_invite_link(self):
+        from bot.handlers.country import process_admin_create_country_finish
+        msg = MagicMock(spec=types.Message)
+        msg.from_user.id = self.admin.chat_id
+        msg.text = "t.me/+2dadplapdkakd"
+        msg.answer = AsyncMock()
+
+        state = AsyncMock()
+        state.get_data.return_value = {
+            "name": "Invite Currency",
+            "code": "INV",
+            "channel_id": "-1001234567890",
+        }
+        state.finish = AsyncMock()
+
+        with patch("bot.handlers.country.bot.send_message", new_callable=AsyncMock) as mock_send_card:
+            asyncio.run(process_admin_create_country_finish(msg, state))
+            msg.answer.assert_called_once()
+            ans_text = msg.answer.call_args[0][0]
+            self.assertIn("https://t.me/+2dadplapdkakd", ans_text)
+            self.assertIn("Invite Currency", ans_text)
+
+            created_c = CountryLogics.get_by_code("INV")
+            self.assertIsNotNone(created_c)
+            self.assertEqual(created_c.channel_url, "https://t.me/+2dadplapdkakd")
+
+            # Verify card was also sent without error
+            mock_send_card.assert_called_once()
+            card_text = mock_send_card.call_args[1]["text"]
+            self.assertIn("https://t.me/+2dadplapdkakd", card_text)
+
+            # Cleanup
+            CountryLogics.set_removed(created_c)
+
 
 if __name__ == "__main__":
     unittest.main()

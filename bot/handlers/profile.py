@@ -391,7 +391,10 @@ async def process_open_profile(message: types.Message, state: FSMContext = None)
 
     country = UserLogics.get_safe_country(user)
     channel_url = (country.channel_url if country and country.channel_url else COMMUNITY_URL) or "https://t.me"
-    channel_str_link = f"<a href='{channel_url}'>Channel</a>"
+    channel_url = channel_url.strip()
+    if channel_url and not channel_url.startswith(("http://", "https://", "tg://")):
+        channel_url = f"https://{channel_url}"
+    channel_str_link = f"<a href='{html_escape(channel_url)}'>Channel</a>"
     country_name = country.name if country else "Not selected"
     site_id_text = html_escape(user.site_id) if user.site_id else "📛 Not specified"
     display_name = html_escape(user.nickname or user.username or "User")

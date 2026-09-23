@@ -114,6 +114,16 @@ class TestModelsAndLogics(unittest.TestCase):
         self.assertEqual(CountryLogics.get_by_id(c.id).channel_id, "-100111222")
         CountryLogics.update(c, channel_id="-100999888")
 
+        # Test URL normalization (e.g. t.me/+invite, @channel, -, etc.)
+        self.assertEqual(CountryLogics._normalize_channel_url("t.me/+2dadplapdkakd"), "https://t.me/+2dadplapdkakd")
+        self.assertEqual(CountryLogics._normalize_channel_url("+2dadplapdkakd"), "https://t.me/+2dadplapdkakd")
+        self.assertEqual(CountryLogics._normalize_channel_url("@mychannel"), "https://t.me/mychannel")
+        self.assertEqual(CountryLogics._normalize_channel_url("-"), "")
+        self.assertEqual(CountryLogics._normalize_channel_url(""), "")
+
+        CountryLogics.update(c, channel_url="t.me/+2dadplapdkakd")
+        self.assertEqual(CountryLogics.get_by_id(c.id).channel_url, "https://t.me/+2dadplapdkakd")
+
         CountryLogics.update(c, channel_url="https://t.me/testopia_new")
         self.assertEqual(CountryLogics.get_by_id(c.id).channel_url, "https://t.me/testopia_new")
 

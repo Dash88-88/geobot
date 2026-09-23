@@ -1,5 +1,6 @@
 import logging
 from asyncio import sleep
+from html import escape as html_escape
 from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.builtin import Command, Text
@@ -154,13 +155,18 @@ async def _send_country_card(chat_id: int, country_id: str):
     user_count = UserLogics.count(country_id=country.id, is_active=True)
     status_text = "🟢 Active" if country.is_active else "🔴 Hidden / Inactive"
 
+    safe_name = html_escape(country.name)
+    safe_code = html_escape(country.code)
+    safe_cid = html_escape(country.channel_id or 'Not configured')
+    safe_url = html_escape(country.channel_url or 'Not configured')
+
     card_text = (
-        f"💱 <b>Currency:</b> {country.name}\n"
-        f"🔤 <b>Code:</b> <code>{country.code}</code>\n"
+        f"💱 <b>Currency:</b> {safe_name}\n"
+        f"🔤 <b>Code:</b> <code>{safe_code}</code>\n"
         f"📊 <b>Status:</b> {status_text}\n"
         f"👥 <b>Active Users:</b> {user_count}\n"
-        f"📢 <b>Channel ID:</b> <code>{country.channel_id or 'Not configured'}</code>\n"
-        f"🔗 <b>Channel URL:</b> {country.channel_url or 'Not configured'}"
+        f"📢 <b>Channel ID:</b> <code>{safe_cid}</code>\n"
+        f"🔗 <b>Channel URL:</b> {safe_url}"
     )
 
     await bot.send_message(
@@ -434,9 +440,10 @@ async def process_admin_update_country_channel_url_prompt(call: types.CallbackQu
 
     await state.update_data(country_id=country_id)
     await UpdateCountryChannelUrl.send_channel_url.set()
+    current_url_safe = html_escape(country.channel_url or 'Not configured')
     await call.message.answer(
         f"🔗 <b>Update Channel URL</b>\n\n"
-        f"Current Channel URL: {country.channel_url or 'Not configured'}\n\n"
+        f"Current Channel URL: {current_url_safe}\n\n"
         f"Enter new public or invite URL to join the channel (e.g. <i>https://t.me/my_channel</i> or <i>https://t.me/+joinlink</i>):\n"
         f"<i>Send - to clear</i>",
         reply_markup=cancel_keyboard(),
@@ -463,8 +470,9 @@ async def process_admin_update_country_channel_url(message: types.Message, state
         return
 
     CountryLogics.update(country, channel_url=channel_url)
+    updated_url_safe = html_escape(country.channel_url or 'Not configured')
     await message.answer(
-        f"✅ Channel URL successfully updated to {country.channel_url or 'Not configured'}!",
+        f"✅ Channel URL successfully updated to {updated_url_safe}!",
         reply_markup=manage_keyboard(),
         parse_mode="HTML",
         disable_web_page_preview=True
@@ -534,12 +542,15 @@ async def process_admin_create_country_code(message: types.Message, state: FSMCo
 @dp.message_handler(UserFilter(only_managers=True), state=CreateNewCountry.send_channel_id, content_types=(ContentType.TEXT,))
 async def process_admin_create_country_channel_id(message: types.Message, state: FSMContext):
     channel_id = message.text.strip()
+    if channel_id == "-":
+        channel_id = ""
     await state.update_data(channel_id=channel_id)
     await CreateNewCountry.send_channel_url.set()
+    display_cid = html_escape(channel_id) if channel_id else "Skipped"
     await message.answer(
-        f"✅ Channel ID set: <code>{channel_id}</code>\n\n"
-        "<b>Step 4/4:</b> Enter public or invite URL to join the channel\n"
-        "<i>Example: https://t.me/my_currency_channel or https://t.me/+joinlink</i>",
+        f"✅ Channel ID set: <code>{display_cid}</code>\n\n"
+        "<b>Step 4/4:</b> Enter public or invite URL to join the channel (or <code>-</code> to skip)\n"
+        "<i>Example: https://t.me/my_currency_channel or t.me/+joinlink</i>",
         reply_markup=cancel_keyboard(),
         parse_mode="HTML"
     )
@@ -548,6 +559,8 @@ async def process_admin_create_country_channel_id(message: types.Message, state:
 @dp.message_handler(UserFilter(only_managers=True), state=CreateNewCountry.send_channel_url, content_types=(ContentType.TEXT,))
 async def process_admin_create_country_finish(message: types.Message, state: FSMContext):
     channel_url = message.text.strip()
+    if channel_url == "-":
+        channel_url = ""
     data = await state.get_data()
     await state.finish()
 
@@ -563,12 +576,17 @@ async def process_admin_create_country_finish(message: types.Message, state: FSM
         is_active=True
     )
 
+    safe_name = html_escape(country.name)
+    safe_code = html_escape(country.code)
+    safe_cid = html_escape(country.channel_id or "Not configured")
+    safe_url = html_escape(country.channel_url or "Not configured")
+
     await message.answer(
         f"🎉 <b>Currency successfully created!</b>\n\n"
-        f"💱 <b>Name:</b> {country.name}\n"
-        f"🔤 <b>Code:</b> <code>{country.code}</code>\n"
-        f"📢 <b>Channel:</b> <code>{country.channel_id}</code>\n"
-        f"🔗 <b>URL:</b> {country.channel_url}",
+        f"💱 <b>Name:</b> {safe_name}\n"
+        f"🔤 <b>Code:</b> <code>{safe_code}</code>\n"
+        f"📢 <b>Channel:</b> <code>{safe_cid}</code>\n"
+        f"🔗 <b>URL:</b> {safe_url}",
         reply_markup=manage_keyboard(),
         parse_mode="HTML"
     )

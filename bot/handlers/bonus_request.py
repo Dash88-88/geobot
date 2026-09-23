@@ -1,5 +1,6 @@
 import logging
 from asyncio import sleep
+from html import escape as html_escape
 from aiogram import types
 from aiogram.dispatcher.filters import Text
 from bot.filters import UserFilter
@@ -473,8 +474,11 @@ async def process_request_bonus(call: types.CallbackQuery, callback_data: dict):
     user_subscribed = await UserLogics.is_subscriber(bot=bot, chat_id=user.chat_id, user=user)
     if not user_subscribed:
         channel_url = (user.country.channel_url if user.country and user.country.channel_url else COMMUNITY_URL) or "https://t.me"
+        channel_url = channel_url.strip()
+        if channel_url and not channel_url.startswith(("http://", "https://", "tg://")):
+            channel_url = f"https://{channel_url}"
         await call.message.answer(
-            f"Subscribe to our 👉 <a href='{channel_url}'>CHANNEL</a> to request the Bonus 📰",
+            f"Subscribe to our 👉 <a href='{html_escape(channel_url)}'>CHANNEL</a> to request the Bonus 📰",
             reply_markup=main_menu_keyboard(),
             disable_web_page_preview=True,
             parse_mode="HTML"
