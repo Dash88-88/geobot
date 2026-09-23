@@ -22,4 +22,8 @@ def create_tables():
         db.execute_sql("ALTER TABLE bonusrequest ADD COLUMN IF NOT EXISTS reject_reason character varying(255);")
     except Exception:
         pass
+    try:
+        db.execute_sql("UPDATE \"user\" SET \"group\" = 'neutral' WHERE \"group\" = 'all';")
+    except Exception:
+        pass
 

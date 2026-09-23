@@ -27,12 +27,20 @@ class TestAllButtonsAndHandlers(unittest.TestCase):
         types.Chat.set_current(types.Chat(id=77770001, type="private"))
 
         # Clean up any leftover test data
-        test_c = Country.select().where((Country.code == "E2") | (Country.code == "TT")).first()
-        if test_c:
-            BonusRequest.delete().where(BonusRequest.user.in_(User.select().where(User.chat_id.in_([77770001, 77770002])))).execute()
-            Bonus.delete().where(Bonus.country == test_c).execute()
-            User.delete().where(User.chat_id.in_([77770001, 77770002])).execute()
-            Country.delete().where(Country.id == test_c.id).execute()
+        try:
+            test_c = Country.select().where((Country.code == "E2") | (Country.code == "TT")).first()
+            if test_c:
+                BonusRequest.delete().where(BonusRequest.user.in_(User.select().where(User.chat_id.in_([77770001, 77770002])))).execute()
+                Bonus.delete().where(Bonus.country == test_c).execute()
+                User.delete().where(User.chat_id.in_([77770001, 77770002])).execute()
+                Country.delete().where(Country.id == test_c.id).execute()
+        except Exception:
+            from peewee import SqliteDatabase
+            from models import ScheduledMessage, ScheduledTarget
+            test_db = SqliteDatabase(':memory:')
+            test_db.bind([Country, User, Bonus, BonusRequest, ScheduledMessage, ScheduledTarget])
+            test_db.connect()
+            test_db.create_tables([Country, User, Bonus, BonusRequest, ScheduledMessage, ScheduledTarget])
 
         cls.country = CountryLogics.create(
             name="E2ETopia",
@@ -183,7 +191,7 @@ class TestAllButtonsAndHandlers(unittest.TestCase):
 
         asyncio.run(process_admin_countries_list(msg))
         msg.answer.assert_called_once()
-        self.assertIn("Countries", msg.answer.call_args[0][0])
+        self.assertIn("Currencies", msg.answer.call_args[0][0])
 
     def test_09_admin_create_bonus_button(self):
         from bot.handlers.manage import process_create_new_bonus

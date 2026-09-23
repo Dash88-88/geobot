@@ -320,7 +320,7 @@ async def process_create_new_bonus_description(message: types.Message, state: FS
     try:
         await message.answer(
             f"✅ <b>New bonus created!</b> 🔴 <i>(inactive)</i>\n"
-            f"🌍 Country: <b>🌍 All Countries</b>\n"
+            f"💱 Currency: <b>💱 All Currencies</b>\n"
             f"👥 Group: {group_icon} <b>all</b>\n"
             f"💌 Requests: <b>Enabled</b>\n\n"
             f"{html.escape(text)}\n\n"
@@ -331,7 +331,7 @@ async def process_create_new_bonus_description(message: types.Message, state: FS
     except Exception:
         await message.answer(
             f"✅ New bonus created! 🔴 (inactive)\n"
-            f"🌍 Country: All Countries\n"
+            f"💱 Currency: All Currencies\n"
             f"👥 Group: {group_icon} all\n"
             f"💌 Requests: Enabled\n\n"
             f"{text}\n\n"
@@ -358,10 +358,10 @@ async def process_create_new_bonus_country(call: types.CallbackQuery, callback_d
         country=target_country
     )
 
-    country_name = target_country.name if target_country else "🌍 All Countries"
+    country_name = target_country.name if target_country else "💱 All Currencies"
     await call.message.delete()
     await call.message.answer(
-        f"✅ <b>New bonus successfully created!</b>\n🌍 Country: <b>{country_name}</b>",
+        f"✅ <b>New bonus successfully created!</b>\n💱 Currency: <b>{country_name}</b>",
         reply_markup=view_bonus_keyboard(bonus_id=bonus.id),
         parse_mode="HTML"
     )
@@ -654,15 +654,15 @@ async def approve_group_message_handler(call: types.CallbackQuery, state: FSMCon
 
 # ==================== BROADCAST TO COUNTRY ====================
 
-@dp.message_handler(Text([DefaultKeyboardButtons.SendMessageToCountry.value, "📩 👥 🌍"]), UserFilter(only_managers=True), state="*")
+@dp.message_handler(Text([DefaultKeyboardButtons.SendMessageToCountry.value, "📩 Message Currency", "📩 Message Country", "📩 👥 🌍", "📩 👥 💱"], ignore_case=True), UserFilter(only_managers=True), state="*")
 async def process_send_message_to_country_start(message: types.Message, state: FSMContext = None):
     if state:
         await state.finish()
     countries = CountryLogics.get_list(is_removed=False)
     if not countries:
-        await message.answer("No countries available. Please create a country first.", reply_markup=manage_keyboard())
+        await message.answer("No currencies available. Please create a currency first.", reply_markup=manage_keyboard())
         return
-    await message.answer("Select target country to broadcast 👉:", reply_markup=message_country_keyboard(countries))
+    await message.answer("Select target currency to broadcast 👉:", reply_markup=message_country_keyboard(countries))
 
 
 @dp.callback_query_handler(send_message_to_country_callback.filter(), UserFilter(only_managers=True))
@@ -670,7 +670,7 @@ async def process_send_message_to_selected_country(call: types.CallbackQuery, ca
     country_id = callback_data.get('country_id')
     country = CountryLogics.get_by_id(country_id)
     if not country:
-        await call.answer("Country not found.", show_alert=True)
+        await call.answer("Currency not found.", show_alert=True)
         return
 
     await SendMessageToCountry.send_message.set()
@@ -721,7 +721,7 @@ async def cancel_country_message_handler(call: types.CallbackQuery, state: FSMCo
         await call.message.delete()
     except Exception:
         pass
-    await call.message.answer("🚫 Country message cancelled.", reply_markup=manage_keyboard())
+    await call.message.answer("🚫 Currency message cancelled.", reply_markup=manage_keyboard())
     if state:
         await state.finish()
 
@@ -751,27 +751,27 @@ async def approve_country_message_handler(call: types.CallbackQuery, state: FSMC
 
     users = [u for u in UserLogics.get_country_list(country_id=country_id) if u.is_active and not u.is_blocked]
     if not users:
-        await call.message.answer(f"🚫 No active users found in {country.name if country else 'selected country'}.", reply_markup=manage_keyboard())
+        await call.message.answer(f"🚫 No active users found in {country.name if country else 'selected currency'}.", reply_markup=manage_keyboard())
         if state:
             await state.finish()
         return
 
-    await _execute_broadcast(call, manager, users, text, image_url, button_url, send_at, target_name=f"country {country.name if country else country_id}")
+    await _execute_broadcast(call, manager, users, text, image_url, button_url, send_at, target_name=f"currency {country.name if country else country_id}")
     if state:
         await state.finish()
 
 
 # ==================== BROADCAST TO COUNTRY + GROUP ====================
 
-@dp.message_handler(Text([DefaultKeyboardButtons.SendMessageToCountryGroup.value, "📩 👥 🌍 🟧"]), UserFilter(only_managers=True), state="*")
+@dp.message_handler(Text([DefaultKeyboardButtons.SendMessageToCountryGroup.value, "📩 Message Currency+Group", "📩 Message Country+Group", "📩 👥 🌍 🟧", "📩 👥 💱 🟧"], ignore_case=True), UserFilter(only_managers=True), state="*")
 async def process_send_message_to_country_group_start(message: types.Message, state: FSMContext = None):
     if state:
         await state.finish()
     countries = CountryLogics.get_list(is_removed=False)
     if not countries:
-        await message.answer("No countries available. Please create a country first.", reply_markup=manage_keyboard())
+        await message.answer("No currencies available. Please create a currency first.", reply_markup=manage_keyboard())
         return
-    await message.answer("Select target country 👉:", reply_markup=message_country_group_select_country_keyboard(countries))
+    await message.answer("Select target currency 👉:", reply_markup=message_country_group_select_country_keyboard(countries))
 
 
 @dp.callback_query_handler(send_message_to_country_group_country_callback.filter(), UserFilter(only_managers=True))
@@ -779,11 +779,11 @@ async def process_send_message_cg_select_group(call: types.CallbackQuery, callba
     country_id = callback_data.get('country_id')
     country = CountryLogics.get_by_id(country_id)
     if not country:
-        await call.answer("Country not found.", show_alert=True)
+        await call.answer("Currency not found.", show_alert=True)
         return
 
     await call.message.answer(
-        f"Select group for country <b>{country.name}</b> 👉:",
+        f"Select group for currency <b>{country.name}</b> 👉:",
         reply_markup=message_country_group_select_group_keyboard(country_id),
         parse_mode="HTML"
     )
@@ -877,7 +877,7 @@ async def approve_country_group_message_handler(call: types.CallbackQuery, state
 
     users = [u for u in UserLogics.get_country_list(country_id=country_id, group=group) if u.is_active and not u.is_blocked]
     if not users:
-        await call.message.answer(f"🚫 No active users found in {country.name if country else 'country'} for group {group}.", reply_markup=manage_keyboard())
+        await call.message.answer(f"🚫 No active users found in {country.name if country else 'currency'} for group {group}.", reply_markup=manage_keyboard())
         if state:
             await state.finish()
         return

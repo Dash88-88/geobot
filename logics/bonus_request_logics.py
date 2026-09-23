@@ -27,7 +27,7 @@ class BonusRequestLogics:
 
     @classmethod
     def approve(cls, bonus_request: BonusRequest) -> None:
-        with db.atomic():
+        with BonusRequest._meta.database.atomic():
             fresh_request = cls.get_by_id(bonus_request.id)
             if not fresh_request:
                 return
@@ -41,7 +41,7 @@ class BonusRequestLogics:
 
     @classmethod
     def cancel(cls, bonus_request: BonusRequest, reject_reason: str = None) -> None:
-        with db.atomic():
+        with BonusRequest._meta.database.atomic():
             fresh_request = cls.get_by_id(bonus_request.id)
             if not fresh_request:
                 return
@@ -56,7 +56,7 @@ class BonusRequestLogics:
 
     @classmethod
     def activate(cls, bonus_request: BonusRequest) -> None:
-        with db.atomic():
+        with BonusRequest._meta.database.atomic():
             fresh_request = cls.get_by_id(bonus_request.id)
             if not fresh_request:
                 return

@@ -32,12 +32,26 @@ class TestModelsAndLogics(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         # Pre-cleanup in case of prior interrupted run
-        test_c = Country.select().where((Country.code == "TT") | (Country.code == "TU")).first()
-        if test_c:
-            BonusRequest.delete().where(BonusRequest.user.in_(User.select().where(User.chat_id.in_([88880001, 88880002])))).execute()
-            Bonus.delete().where(Bonus.country == test_c).execute()
-            User.delete().where(User.chat_id.in_([88880001, 88880002])).execute()
-            Country.delete().where(Country.id == test_c.id).execute()
+        try:
+            test_c = Country.select().where((Country.code == "TT") | (Country.code == "TU")).first()
+            if test_c:
+                BonusRequest.delete().where(BonusRequest.user.in_(User.select().where(User.chat_id.in_([88880001, 88880002])))).execute()
+                Bonus.delete().where(Bonus.country == test_c).execute()
+                User.delete().where(User.chat_id.in_([88880001, 88880002])).execute()
+                Country.delete().where(Country.id == test_c.id).execute()
+        except Exception:
+            from peewee import SqliteDatabase
+            from models import ScheduledMessage, ScheduledTarget
+            import logics.bonus_request_logics
+            import models.base
+            import models
+            test_db = SqliteDatabase(':memory:')
+            test_db.bind([Country, User, Bonus, BonusRequest, ScheduledMessage, ScheduledTarget])
+            test_db.connect()
+            test_db.create_tables([Country, User, Bonus, BonusRequest, ScheduledMessage, ScheduledTarget])
+            models.base.db = test_db
+            models.db = test_db
+            logics.bonus_request_logics.db = test_db
 
         # Create test records
         cls.test_country = CountryLogics.create(
@@ -144,6 +158,8 @@ class TestModelsAndLogics(unittest.TestCase):
         self.assertGreaterEqual(len(country_users), 2)
 
         # Group transition tests
+        self.assertEqual(UserLogics.get_by_id(self.test_user.id).group, Groups.Neutral.value)
+
         UserLogics.set_group_vip(self.test_user)
         self.assertEqual(UserLogics.get_by_id(self.test_user.id).group, Groups.Vip.value)
 

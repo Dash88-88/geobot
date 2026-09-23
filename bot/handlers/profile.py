@@ -75,7 +75,7 @@ async def _send_user_info(message: types.Message, user_id: str):
     await message.answer(
         f"<pre>{user.chat_id}</pre>\n"
         f"🔗: {user_display}, 🃏: <b>{site_id_text}</b>\n"
-        f"🌍: <b>{country_name}</b>\n"
+        f"💱: <b>{country_name}</b>\n"
         f"📣: <b>{'✅ Subscribed' if user_subscribed else '📛 Not subscribed!'}</b>\n"
         f"⚖️: <b>Referrals:</b> {referrals_count}\n"
         f"📤: <b>Source:</b> \n<pre>{source}</pre>\n"
@@ -398,7 +398,7 @@ async def process_open_profile(message: types.Message, state: FSMContext = None)
 
     await message.answer(
         f"🌟 <b>Profile:</b> {display_name}\n"
-        f"🌍 <b>Country:</b> {country_name}\n"
+        f"💱 <b>Currency:</b> {country_name}\n"
         f"🃏 <b>Site ID / Nickname:</b> {site_id_text}\n"
         f"📣 <b>Status:</b> {'✅ Subscribed' if user_subscribed else f'📛 Please subscribe to our {channel_str_link}'}",
         disable_web_page_preview=True,

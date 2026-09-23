@@ -67,7 +67,7 @@ async def process_select_country(call: types.CallbackQuery, callback_data: dict,
 
     country = CountryLogics.get_by_id(country_id)
     if not country or not country.is_active or country.is_removed:
-        await call.answer("This country is no longer available. Please choose another one.", show_alert=True)
+        await call.answer("This currency is no longer available. Please choose another one.", show_alert=True)
         active_countries = CountryLogics.get_list(is_active=True, is_removed=False)
         if active_countries:
             await call.message.edit_reply_markup(reply_markup=select_country_keyboard(active_countries, is_change=is_change))
@@ -88,12 +88,12 @@ async def process_select_country(call: types.CallbackQuery, callback_data: dict,
     else:
         UserLogics.set_country(user, country)
 
-    await call.answer(f"Country selected: {country.name} ✅")
+    await call.answer(f"Currency selected: {country.name} ✅")
     await call.message.delete()
 
     if is_change and user.site_id:
         await call.message.answer(
-            f"🌍 Your country has been updated to <b>{country.name}</b>!",
+            f"💱 Your currency has been updated to <b>{country.name}</b>!",
             reply_markup=main_menu_keyboard(),
             parse_mode="HTML"
         )
@@ -101,7 +101,7 @@ async def process_select_country(call: types.CallbackQuery, callback_data: dict,
         await UpdateSiteID.send_site_id.set()
         reg_link = f"\n\nDon't have an account yet? Register <a href='{REGISTRATION_URL}'>HERE</a>" if REGISTRATION_URL else ""
         await call.message.answer(
-            f"🌍 Country selected: <b>{country.name}</b>\n\n"
+            f"💱 Currency selected: <b>{country.name}</b>\n\n"
             f"🃏 <b>Please enter your Site ID / Nickname:</b>\n"
             f"<i>Without Site ID / Nickname, you will not be able to use the bot and request bonuses.</i>"
             f"{reg_link}",
@@ -121,7 +121,7 @@ async def process_select_country(call: types.CallbackQuery, callback_data: dict,
 
         await call.message.answer(
             f"Welcome, {call.from_user.first_name or 'friend'} 👋!\n"
-            f"🌍 Country: <b>{country.name}</b>",
+            f"💱 Currency: <b>{country.name}</b>",
             reply_markup=main_menu_keyboard() if not user.is_manager else manage_keyboard(),
             parse_mode="HTML"
         )
@@ -133,11 +133,11 @@ async def process_user_request_change_country(call: types.CallbackQuery, state: 
         await state.finish()
     active_countries = CountryLogics.get_list(is_active=True, is_removed=False)
     if not active_countries:
-        await call.answer("No active countries available at the moment.", show_alert=True)
+        await call.answer("No active currencies available at the moment.", show_alert=True)
         return
 
     await call.message.answer(
-        "🌍 <b>Select your new country:</b>",
+        "💱 <b>Select your new currency:</b>",
         reply_markup=select_country_keyboard(active_countries, is_change=True),
         parse_mode="HTML"
     )
@@ -155,7 +155,7 @@ async def _send_country_card(chat_id: int, country_id: str):
     status_text = "🟢 Active" if country.is_active else "🔴 Hidden / Inactive"
 
     card_text = (
-        f"🌍 <b>Country:</b> {country.name}\n"
+        f"💱 <b>Currency:</b> {country.name}\n"
         f"🔤 <b>Code:</b> <code>{country.code}</code>\n"
         f"📊 <b>Status:</b> {status_text}\n"
         f"👥 <b>Active Users:</b> {user_count}\n"
@@ -172,8 +172,8 @@ async def _send_country_card(chat_id: int, country_id: str):
     )
 
 
-@dp.message_handler(UserFilter(only_managers=True), Command("countries"), state="*")
-@dp.message_handler(UserFilter(only_managers=True), Text([DefaultKeyboardButtons.Countries.value, "🌍 Countries"], ignore_case=True), state="*")
+@dp.message_handler(UserFilter(only_managers=True), Command(["currencies", "countries"]), state="*")
+@dp.message_handler(UserFilter(only_managers=True), Text([DefaultKeyboardButtons.Countries.value, "💱 Currencies", "🌍 Countries"], ignore_case=True), state="*")
 @dp.callback_query_handler(UserFilter(only_managers=True), text=CallbackQueryTypes.ManageCountries.value, state="*")
 async def process_admin_countries_list(update: types.Message or types.CallbackQuery, state: FSMContext = None):
     if state:
@@ -187,13 +187,13 @@ async def process_admin_countries_list(update: types.Message or types.CallbackQu
 
     if not countries:
         await message.answer(
-            "🌍 <b>Countries Management</b>\n\nNo countries found. Click below to add the first country.",
+            "💱 <b>Currencies Management</b>\n\nNo currencies found. Click below to add the first currency.",
             reply_markup=countries_admin_list_keyboard(countries),
             parse_mode="HTML"
         )
     else:
         await message.answer(
-            f"🌍 <b>Countries Management</b> (Total: {len(countries)}):\nSelect a country to view/edit details or add a new one:",
+            f"💱 <b>Currencies Management</b> (Total: {len(countries)}):\nSelect a currency to view/edit details or add a new one:",
             reply_markup=countries_admin_list_keyboard(countries),
             parse_mode="HTML"
         )
@@ -212,16 +212,16 @@ async def process_admin_toggle_country(call: types.CallbackQuery, callback_data:
     action = callback_data.get("action")
     country = CountryLogics.get_by_id(country_id)
     if not country:
-        await call.answer("Country not found.", show_alert=True)
+        await call.answer("Currency not found.", show_alert=True)
         return
 
     try:
         if action == "enable":
             CountryLogics.enable(country)
-            await call.answer("Country enabled! 🟢", show_alert=True)
+            await call.answer("Currency enabled! 🟢", show_alert=True)
         else:
             CountryLogics.disable(country)
-            await call.answer("Country disabled! 🔴", show_alert=True)
+            await call.answer("Currency disabled! 🔴", show_alert=True)
     except (CountryAlreadyEnabledError, CountryAlreadyDisabledError):
         await call.answer("Status already set.", show_alert=True)
 
@@ -234,12 +234,12 @@ async def process_admin_delete_country_prompt(call: types.CallbackQuery, callbac
     country_id = callback_data.get("country_id")
     country = CountryLogics.get_by_id(country_id)
     if not country:
-        await call.answer("Country not found.", show_alert=True)
+        await call.answer("Currency not found.", show_alert=True)
         return
 
     await call.message.answer(
         f"⚠️ Are you sure you want to delete <b>{country.name}</b>?\n"
-        f"Users in this country will be prompted to choose a new country on their next action.",
+        f"Users with this currency will be prompted to choose a new currency on their next action.",
         reply_markup=delete_country_confirmation_keyboard(country_id=country_id),
         parse_mode="HTML"
     )
@@ -260,7 +260,7 @@ async def process_admin_delete_country_approve(call: types.CallbackQuery, callba
     if country:
         try:
             CountryLogics.set_removed(country)
-            await call.answer("Country successfully deleted! 🗑️", show_alert=True)
+            await call.answer("Currency successfully deleted! 🗑️", show_alert=True)
         except CountryAlreadyRemovedError:
             pass
 
@@ -268,7 +268,7 @@ async def process_admin_delete_country_approve(call: types.CallbackQuery, callba
     # Return to countries list
     countries = CountryLogics.get_list(is_removed=False)
     await call.message.answer(
-        f"🌍 <b>Countries Management</b> (Total: {len(countries)}):",
+        f"💱 <b>Currencies Management</b> (Total: {len(countries)}):",
         reply_markup=countries_admin_list_keyboard(countries),
         parse_mode="HTML"
     )
@@ -281,15 +281,15 @@ async def process_admin_update_country_name_prompt(call: types.CallbackQuery, ca
     country_id = callback_data.get("country_id")
     country = CountryLogics.get_by_id(country_id)
     if not country or country.is_removed:
-        await call.answer("Country not found.", show_alert=True)
+        await call.answer("Currency not found.", show_alert=True)
         return
 
     await state.update_data(country_id=country_id)
     await UpdateCountryName.send_country_name.set()
     await call.message.answer(
-        f"✏️ <b>Update Country Name</b>\n\n"
+        f"✏️ <b>Update Currency Name</b>\n\n"
         f"Current name: <b>{country.name}</b>\n\n"
-        f"Enter new country name and emoji flag (e.g. <i>Turkey 🇹🇷</i>):",
+        f"Enter new currency name and emoji (e.g. <i>US Dollar 💵</i>):",
         reply_markup=cancel_keyboard(),
         parse_mode="HTML"
     )
@@ -301,7 +301,7 @@ async def process_admin_update_country_name_prompt(call: types.CallbackQuery, ca
 async def process_admin_update_country_name(message: types.Message, state: FSMContext):
     name = message.text.strip()
     if len(name) < 2 or len(name) > 64:
-        await message.answer("Country name must be between 2 and 64 characters. Please try again:")
+        await message.answer("Currency name must be between 2 and 64 characters. Please try again:")
         return
 
     data = await state.get_data()
@@ -310,12 +310,12 @@ async def process_admin_update_country_name(message: types.Message, state: FSMCo
 
     country = CountryLogics.get_by_id(country_id)
     if not country or country.is_removed:
-        await message.answer("Country not found.", reply_markup=manage_keyboard())
+        await message.answer("Currency not found.", reply_markup=manage_keyboard())
         return
 
     CountryLogics.update(country, name=name)
     await message.answer(
-        f"✅ Country name successfully updated to <b>{country.name}</b>!",
+        f"✅ Currency name successfully updated to <b>{country.name}</b>!",
         reply_markup=manage_keyboard(),
         parse_mode="HTML"
     )
@@ -328,15 +328,15 @@ async def process_admin_update_country_code_prompt(call: types.CallbackQuery, ca
     country_id = callback_data.get("country_id")
     country = CountryLogics.get_by_id(country_id)
     if not country or country.is_removed:
-        await call.answer("Country not found.", show_alert=True)
+        await call.answer("Currency not found.", show_alert=True)
         return
 
     await state.update_data(country_id=country_id)
     await UpdateCountryCode.send_country_code.set()
     await call.message.answer(
-        f"🔤 <b>Update Country Code</b>\n\n"
+        f"🔤 <b>Update Currency Code</b>\n\n"
         f"Current code: <code>{country.code}</code>\n\n"
-        f"Enter new 2-8 letter country code (e.g. <i>TR, DE</i>):",
+        f"Enter new 2-8 letter currency code (e.g. <i>USD, EUR</i>):",
         reply_markup=cancel_keyboard(),
         parse_mode="HTML"
     )
@@ -348,7 +348,7 @@ async def process_admin_update_country_code_prompt(call: types.CallbackQuery, ca
 async def process_admin_update_country_code(message: types.Message, state: FSMContext):
     code = message.text.strip().upper()
     if len(code) < 2 or len(code) > 8:
-        await message.answer("Country code must be between 2 and 8 characters (e.g. TR, DE). Try again:")
+        await message.answer("Currency code must be between 2 and 8 characters (e.g. USD, EUR). Try again:")
         return
 
     data = await state.get_data()
@@ -357,18 +357,18 @@ async def process_admin_update_country_code(message: types.Message, state: FSMCo
     country = CountryLogics.get_by_id(country_id)
     if not country or country.is_removed:
         await state.finish()
-        await message.answer("Country not found.", reply_markup=manage_keyboard())
+        await message.answer("Currency not found.", reply_markup=manage_keyboard())
         return
 
     existing = CountryLogics.get_by_code(code)
     if existing and str(existing.id) != str(country.id) and not existing.is_removed:
-        await message.answer(f"A country with code <b>{code}</b> already exists! Enter a different code:", parse_mode="HTML")
+        await message.answer(f"A currency with code <b>{code}</b> already exists! Enter a different code:", parse_mode="HTML")
         return
 
     await state.finish()
     CountryLogics.update(country, code=code)
     await message.answer(
-        f"✅ Country code successfully updated to <code>{country.code}</code>!",
+        f"✅ Currency code successfully updated to <code>{country.code}</code>!",
         reply_markup=manage_keyboard(),
         parse_mode="HTML"
     )
@@ -381,7 +381,7 @@ async def process_admin_update_country_channel_id_prompt(call: types.CallbackQue
     country_id = callback_data.get("country_id")
     country = CountryLogics.get_by_id(country_id)
     if not country or country.is_removed:
-        await call.answer("Country not found.", show_alert=True)
+        await call.answer("Currency not found.", show_alert=True)
         return
 
     await state.update_data(country_id=country_id)
@@ -411,7 +411,7 @@ async def process_admin_update_country_channel_id(message: types.Message, state:
 
     country = CountryLogics.get_by_id(country_id)
     if not country or country.is_removed:
-        await message.answer("Country not found.", reply_markup=manage_keyboard())
+        await message.answer("Currency not found.", reply_markup=manage_keyboard())
         return
 
     CountryLogics.update(country, channel_id=channel_id)
@@ -429,7 +429,7 @@ async def process_admin_update_country_channel_url_prompt(call: types.CallbackQu
     country_id = callback_data.get("country_id")
     country = CountryLogics.get_by_id(country_id)
     if not country or country.is_removed:
-        await call.answer("Country not found.", show_alert=True)
+        await call.answer("Currency not found.", show_alert=True)
         return
 
     await state.update_data(country_id=country_id)
@@ -459,7 +459,7 @@ async def process_admin_update_country_channel_url(message: types.Message, state
 
     country = CountryLogics.get_by_id(country_id)
     if not country or country.is_removed:
-        await message.answer("Country not found.", reply_markup=manage_keyboard())
+        await message.answer("Currency not found.", reply_markup=manage_keyboard())
         return
 
     CountryLogics.update(country, channel_url=channel_url)
@@ -481,9 +481,9 @@ async def process_admin_create_country_start(call: types.CallbackQuery, state: F
     await call.answer()
     await CreateNewCountry.send_country_name.set()
     await call.message.answer(
-        "➕ <b>Create New Country</b>\n\n"
-        "<b>Step 1/4:</b> Enter country name and emoji flag\n"
-        "<i>Example: Turkey 🇹🇷 or Germany 🇩🇪</i>",
+        "➕ <b>Create New Currency</b>\n\n"
+        "<b>Step 1/4:</b> Enter currency name and emoji\n"
+        "<i>Example: US Dollar 💵 or Euro 💶</i>",
         reply_markup=cancel_keyboard(),
         parse_mode="HTML"
     )
@@ -493,15 +493,15 @@ async def process_admin_create_country_start(call: types.CallbackQuery, state: F
 async def process_admin_create_country_name(message: types.Message, state: FSMContext):
     name = message.text.strip()
     if len(name) < 2 or len(name) > 64:
-        await message.answer("Country name must be between 2 and 64 characters. Please try again:")
+        await message.answer("Currency name must be between 2 and 64 characters. Please try again:")
         return
 
     await state.update_data(name=name)
     await CreateNewCountry.send_country_code.set()
     await message.answer(
         f"✅ Name set: <b>{name}</b>\n\n"
-        "<b>Step 2/4:</b> Enter 2-3 letter country code\n"
-        "<i>Example: TR, DE, BR, US</i>",
+        "<b>Step 2/4:</b> Enter 2-5 letter currency code\n"
+        "<i>Example: USD, EUR, TRY</i>",
         reply_markup=cancel_keyboard(),
         parse_mode="HTML"
     )
@@ -511,12 +511,12 @@ async def process_admin_create_country_name(message: types.Message, state: FSMCo
 async def process_admin_create_country_code(message: types.Message, state: FSMContext):
     code = message.text.strip().upper()
     if len(code) < 2 or len(code) > 8:
-        await message.answer("Country code must be between 2 and 8 characters (e.g. TR, DE). Try again:")
+        await message.answer("Currency code must be between 2 and 8 characters (e.g. USD, EUR). Try again:")
         return
 
     existing = CountryLogics.get_by_code(code)
     if existing and not existing.is_removed:
-        await message.answer(f"A country with code <b>{code}</b> already exists! Enter a different code:", parse_mode="HTML")
+        await message.answer(f"A currency with code <b>{code}</b> already exists! Enter a different code:", parse_mode="HTML")
         return
 
     await state.update_data(code=code)
@@ -524,7 +524,7 @@ async def process_admin_create_country_code(message: types.Message, state: FSMCo
     await message.answer(
         f"✅ Code set: <b>{code}</b>\n\n"
         "<b>Step 3/4:</b> Enter Telegram Channel ID or Username for subscription verification\n"
-        "<i>Example: -1001234567890 or @my_country_channel</i>\n\n"
+        "<i>Example: -1001234567890 or @my_currency_channel</i>\n\n"
         "⚠️ <i>Ensure the bot is added as an administrator in this channel!</i>",
         reply_markup=cancel_keyboard(),
         parse_mode="HTML"
@@ -539,7 +539,7 @@ async def process_admin_create_country_channel_id(message: types.Message, state:
     await message.answer(
         f"✅ Channel ID set: <code>{channel_id}</code>\n\n"
         "<b>Step 4/4:</b> Enter public or invite URL to join the channel\n"
-        "<i>Example: https://t.me/my_country_channel or https://t.me/+joinlink</i>",
+        "<i>Example: https://t.me/my_currency_channel or https://t.me/+joinlink</i>",
         reply_markup=cancel_keyboard(),
         parse_mode="HTML"
     )
@@ -564,8 +564,8 @@ async def process_admin_create_country_finish(message: types.Message, state: FSM
     )
 
     await message.answer(
-        f"🎉 <b>Country successfully created!</b>\n\n"
-        f"🌍 <b>Name:</b> {country.name}\n"
+        f"🎉 <b>Currency successfully created!</b>\n\n"
+        f"💱 <b>Name:</b> {country.name}\n"
         f"🔤 <b>Code:</b> <code>{country.code}</code>\n"
         f"📢 <b>Channel:</b> <code>{country.channel_id}</code>\n"
         f"🔗 <b>URL:</b> {country.channel_url}",
@@ -588,12 +588,12 @@ async def process_admin_change_user_country_prompt(call: types.CallbackQuery, ca
 
     countries = CountryLogics.get_list(is_removed=False)
     if not countries:
-        await call.answer("No countries created yet. Create a country first.", show_alert=True)
+        await call.answer("No currencies created yet. Create a currency first.", show_alert=True)
         return
 
     current_c_id = target_user.country.id if target_user.country else None
     await call.message.answer(
-        f"Select new country for user <code>{target_user.chat_id}</code>:",
+        f"Select new currency for user <code>{target_user.chat_id}</code>:",
         reply_markup=change_user_country_keyboard(opened_user_id=opened_user_id, countries=countries, current_country_id=current_c_id),
         parse_mode="HTML"
     )
@@ -617,11 +617,11 @@ async def process_admin_set_user_country(call: types.CallbackQuery, callback_dat
     country = CountryLogics.get_by_id(country_id)
 
     if not target_user or not country:
-        await call.answer("Target user or country not found.", show_alert=True)
+        await call.answer("Target user or currency not found.", show_alert=True)
         return
 
     UserLogics.set_country(target_user, country)
-    await call.answer(f"User country set to {country.name} ✅", show_alert=True)
+    await call.answer(f"User currency set to {country.name} ✅", show_alert=True)
 
     from bot.handlers.profile import _send_user_info
     await call.message.delete()
@@ -642,7 +642,7 @@ async def process_admin_change_bonus_country_prompt(call: types.CallbackQuery, c
     current_c_id = bonus.country.id if bonus.country else None
 
     await call.message.answer(
-        "Select target country for this bonus (or All Countries):",
+        "Select target currency for this bonus (or All Currencies):",
         reply_markup=change_bonus_country_keyboard(bonus_id=bonus_id, countries=countries, current_country_id=current_c_id),
         parse_mode="HTML"
     )
@@ -669,12 +669,12 @@ async def process_admin_set_bonus_country(call: types.CallbackQuery, callback_da
 
     if country_id == "all":
         BonusLogics.set_country(bonus, None)
-        await call.answer("Bonus is now global for All Countries 🌍", show_alert=True)
+        await call.answer("Bonus is now global for All Currencies 💱", show_alert=True)
     else:
         country = CountryLogics.get_by_id(country_id)
         if country:
             BonusLogics.set_country(bonus, country)
-            await call.answer(f"Bonus set for {country.name} 🌍", show_alert=True)
+            await call.answer(f"Bonus set for {country.name} 💱", show_alert=True)
 
     from bot.handlers.bonus import _send_bonus_info
     await call.message.delete()

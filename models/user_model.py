@@ -11,7 +11,7 @@ class User(BaseModel):
     site_id = CharField(null=True)
 
     country = ForeignKeyField(Country, null=True, backref='users')
-    group = CharField(default=Groups.All.value)
+    group = CharField(default=Groups.Neutral.value)
     is_manager = BooleanField(default=False)
 
     referral_source = CharField(null=True, default=BuiltInReferralSources.Telegram.value)

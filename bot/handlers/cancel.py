@@ -25,7 +25,7 @@ async def cancel_from_callback(update: types.Message or types.CallbackQuery, sta
             if active_countries:
                 target = update.message if isinstance(update, types.CallbackQuery) else update
                 await target.answer(
-                    "👋 Please select your country to continue:",
+                    "👋 Please select your currency to continue:",
                     reply_markup=select_country_keyboard(active_countries, is_change=False)
                 )
                 if isinstance(update, types.CallbackQuery):

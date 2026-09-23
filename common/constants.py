@@ -39,7 +39,7 @@ class DefaultInlineButtons(Enum):
     SetBonusForRequest = "⚙️💌"
     SetBonusNotForRequest = "⚙️🪧"
     SetBonusGroup = "⚙️🟧"
-    SetBonusCountry = "⚙️🌍"
+    SetBonusCountry = "⚙️💱"
     GoToRequests = "➡️💌"
     SendBonusToUser = "📬 👤"
     SendBonusToGroup = "📬 👥"
@@ -52,15 +52,15 @@ class DefaultInlineButtons(Enum):
     UpdateBonusImageURL = "🖼️ Img"
     ViewBonus = "🔍 🎁"
 
-    # Country Buttons
-    SelectCountry = "🌍 Select Country"
-    ChangeCountry = "🌍 Change Country"
-    AllCountries = "🌍 All Countries"
-    CreateCountry = "➕ Add Country"
+    # Currency Buttons
+    SelectCountry = "💱 Select Currency"
+    ChangeCountry = "💱 Change Currency"
+    AllCountries = "💱 All Currencies"
+    CreateCountry = "➕ Add Currency"
     DeleteCountry = "❌ Del"
     EnableCountry = "🟢 ON"
     DisableCountry = "🔴 OFF"
-    ViewCountry = "🔍 🌍"
+    ViewCountry = "🔍 💱"
     UpdateCountryName = "✏️ Name"
     UpdateCountryCode = "🔤 Code"
     UpdateCountryChannelId = "📢 Channel ID"
@@ -88,7 +88,7 @@ class DefaultInlineButtons(Enum):
     BlockUser = "⚰️ Block"
     UnblockUser = "👼 Unblock"
     SetUserGroup = "⚙️🟧"
-    SetUserCountry = "⚙️🌍"
+    SetUserCountry = "⚙️💱"
 
 
 class DefaultKeyboardButtons(Enum):
@@ -99,12 +99,12 @@ class DefaultKeyboardButtons(Enum):
     Community = "💬 Our Channel"
     BonusTransfer = "🧧 Welcome Bonus"
 
-    Countries = "🌍 Countries"
+    Countries = "💱 Currencies"
     SendMessageToAll = "📩 Broadcast All"
     SendMessageToOne = "📩 Message User"
     SendMessageToGroup = "📩 Message Group"
-    SendMessageToCountry = "📩 Message Country"
-    SendMessageToCountryGroup = "📩 Message Country+Group"
+    SendMessageToCountry = "📩 Message Currency"
+    SendMessageToCountryGroup = "📩 Message Currency+Group"
     CreateBonus = "🎁 Create Bonus"
     AllBonuses = "🔍 All Bonuses"
     AllBonusRequests = "🔍 All Requests"
@@ -279,7 +279,7 @@ class RequestReportTitles(Enum):
     tg_chat_id = "TG CHAT ID"
     site_id = "SITE ID / NICKNAME"
     group = "GROUP"
-    country = "COUNTRY"
+    country = "CURRENCY"
     is_subscribed = "IS SUBSCRIBED"
     bonus_description = "BONUS DESCRIPTION"
 

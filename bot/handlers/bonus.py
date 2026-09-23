@@ -82,7 +82,7 @@ async def _send_bonus_info(user_id: str or int, bonus_id: str, is_requested: boo
     if not bonus or bonus.is_removed:
         return
 
-    country_display = bonus.country.name if bonus.country else "🌍 All Countries"
+    country_display = bonus.country.name if bonus.country else "💱 All Currencies"
 
     if user.is_manager:
         if bonus.photo_url:
@@ -98,7 +98,7 @@ async def _send_bonus_info(user_id: str or int, bonus_id: str, is_requested: boo
         bonus_text_data = (
             f"<b>Description</b>: {bonus.description}\n"
             f"<b>Group</b>: {group_display_dict.get(bonus.group, [bonus.group])[0]}, {bonus.group}\n"
-            f"<b>Country</b>: {country_display}\n"
+            f"<b>Currency</b>: {country_display}\n"
             f"<b>Request-able</b>: {is_for_request_text}\n"
             f"<b>Image URL</b>: {bonus_image_url_link}"
         )

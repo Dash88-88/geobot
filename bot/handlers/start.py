@@ -49,7 +49,7 @@ async def process_start(message: types.Message, state: FSMContext = None):
         active_countries = CountryLogics.get_list(is_active=True, is_removed=False)
         if active_countries:
             await message.answer(
-                "👋 <b>Welcome!</b>\n\nPlease select your country to continue:",
+                "👋 <b>Welcome!</b>\n\nPlease select your currency to continue:",
                 reply_markup=select_country_keyboard(active_countries, is_change=False),
                 parse_mode="HTML"
             )
@@ -57,8 +57,8 @@ async def process_start(message: types.Message, state: FSMContext = None):
         else:
             if user.is_manager:
                 await message.answer(
-                    "⚠️ <b>No countries created yet.</b>\n"
-                    "Please use /m and go to <b>🌍 Countries</b> to create the first country.",
+                    "⚠️ <b>No currencies created yet.</b>\n"
+                    "Please use /m and go to <b>💱 Currencies</b> to create the first currency.",
                     parse_mode="HTML"
                 )
             else:
@@ -73,7 +73,7 @@ async def process_start(message: types.Message, state: FSMContext = None):
         await UpdateSiteID.send_site_id.set()
         reg_link = f"\n\nDon't have an account yet? Register <a href='{REGISTRATION_URL}'>HERE</a>" if REGISTRATION_URL else ""
         await message.answer(
-            f"🌍 Country: <b>{country.name}</b>\n\n"
+            f"💱 Currency: <b>{country.name}</b>\n\n"
             f"🃏 <b>Please enter your Site ID / Nickname:</b>\n"
             f"<i>Without Site ID / Nickname, you will not be able to use the bot and request bonuses.</i>"
             f"{reg_link}",
