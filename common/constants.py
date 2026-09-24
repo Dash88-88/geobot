@@ -31,7 +31,7 @@ class DefaultInlineButtons(Enum):
     # Bonus Logic
     RequestBonus = "📲 Request Bonus"
     BonusAlreadyRequested = "🚀 Bonus Requested"
-    LearMore = "↪️ Open ↩️"
+    LearMore = "Get Bonus"
     RefreshBonusRequest = "🔄 Refresh"
     ApproveBonusRequest = "🛃 Approve"
     DisableBonus = "🔴 OFF"

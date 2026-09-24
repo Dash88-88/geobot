@@ -478,8 +478,8 @@ async def process_confirm_update_site_id(message: types.Message, state: FSMConte
 
         try:
             await message.answer_photo(
-                photo='https://i.pinimg.com/736x/f9/32/f2/f932f20f8e4f42ccef38af270f323b08.jpg',
-                caption="Start smart. Feel the edge from the very first move.\n\n",
+                photo='https://broomfieldcafeandbar.co.uk/assets/images/hero-c1cd07c4e9e1.webp',
+                caption="🔥 Get Started for Just £20!\n\n🔥Make your 1st Deposit starting at £20 to unlock:\n\n🎁 150% Bonus up to £750\n🎰 100 Free Spins\n\nEnjoy your rewards instantly on your first £20 deposit!\n\n",
                 parse_mode="HTML",
                 reply_markup=reply_markup
             )
