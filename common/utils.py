@@ -1,3 +1,4 @@
+import logging
 import os
 import random
 import re
@@ -51,30 +52,46 @@ def is_url(text: str) -> bool:
 
 
 class ReportGenerator:
-    root_pwd = Path(os.getcwd(), 'root')
-    report_filename = f"BonusRequests-{get_current_datetime().year}.xlsx"
-    report_totals_tab_name = 'TOTALS'
-    report_filepath = Path(root_pwd, report_filename)
+    def __init__(self):
+        self.root_pwd = Path(os.getcwd(), 'root')
+        self.report_filename = f"BonusRequests-{get_current_datetime().year}.xlsx"
+        self.report_totals_tab_name = 'TOTALS'
+        self.report_filepath = Path(self.root_pwd, self.report_filename)
 
-    bold_font = Font(bold=True)
-    gray_fill = PatternFill(
-        fill_type="solid",
-        start_color="DDDDDD",
-        end_color="DDDDDD"
-    )
+        self.bold_font = Font(bold=True)
+        self.gray_fill = PatternFill(
+            fill_type="solid",
+            start_color="DDDDDD",
+            end_color="DDDDDD"
+        )
 
     def is_running(self) -> bool:
-        file_exists = self.root_pwd.exists()
-        if not file_exists:
-            os.mkdir(self.root_pwd)
-        return file_exists
+        if self.root_pwd.exists():
+            # If the directory is older than 5 minutes, consider it a stale lock from a previous crash
+            try:
+                mtime = self.root_pwd.stat().st_mtime
+                if time.time() - mtime > 300:
+                    logging.warning("Stale report generation directory detected. Cleaning up.")
+                    self.finish()
+                    self.root_pwd.mkdir(parents=True, exist_ok=True)
+                    return False
+            except Exception:
+                pass
+            return True
+        self.root_pwd.mkdir(parents=True, exist_ok=True)
+        return False
 
     def finish(self):
-        shutil.rmtree(self.root_pwd)
+        try:
+            if self.root_pwd.exists():
+                shutil.rmtree(self.root_pwd, ignore_errors=True)
+        except Exception:
+            pass
 
-    def run_bonus_request_generation(self, bonus_requests_data: [], totals_user_data: [], top_referral_sources_data: {}):
+    def run_bonus_request_generation(self, bonus_requests_data: list, totals_user_data: dict, top_referral_sources_data: list):
+        self.root_pwd.mkdir(parents=True, exist_ok=True)
         wb = openpyxl.Workbook()
-        wb.remove(wb.active)  # Remove the default sheet
+        default_sheet = wb.active
 
         # Organize data by month
         from collections import defaultdict
@@ -84,6 +101,11 @@ class ReportGenerator:
 
         for record in bonus_requests_data:
             created_at = record.get(RequestReportTitles.request_created_at.value)
+            if isinstance(created_at, str):
+                try:
+                    created_at = datetime.fromisoformat(created_at)
+                except Exception:
+                    pass
             if not isinstance(created_at, datetime):
                 continue  # skip invalid dates
             if created_at.year != current_year:
@@ -93,35 +115,46 @@ class ReportGenerator:
 
         headers = [title.value for title in RequestReportTitles]
 
-        for month, records in sorted(data_by_month.items()):
-            ws = wb.create_sheet(title=month)
+        if not data_by_month:
+            # If there are no bonus requests for this year, create an empty sheet for requests
+            month_title = get_current_datetime().strftime("%B")
+            ws = wb.create_sheet(title=month_title)
             ws.append(headers)
             ws.freeze_panes = "A2"
-
-            # Header styling
             for col_idx, header in enumerate(headers, start=1):
                 cell = ws.cell(row=1, column=col_idx)
                 cell.font = self.bold_font
                 cell.alignment = Alignment(horizontal="center", vertical="center")
                 ws.column_dimensions[get_column_letter(col_idx)].width = 22
                 cell.fill = self.gray_fill
+        else:
+            for month, records in sorted(data_by_month.items()):
+                ws = wb.create_sheet(title=month)
+                ws.append(headers)
+                ws.freeze_panes = "A2"
 
-            # Add records
-            for record in records:
-                row = [record.get(h, '') for h in headers]
-                ws.append(row)
-
-            # Center-align all data cells
-            for row in ws.iter_rows(min_row=2, max_row=ws.max_row, min_col=1, max_col=len(headers)):
-                for cell in row:
+                # Header styling
+                for col_idx, header in enumerate(headers, start=1):
+                    cell = ws.cell(row=1, column=col_idx)
+                    cell.font = self.bold_font
                     cell.alignment = Alignment(horizontal="center", vertical="center")
+                    ws.column_dimensions[get_column_letter(col_idx)].width = 22
+                    cell.fill = self.gray_fill
 
-            # Add autofilter
-            ws.auto_filter.ref = ws.dimensions
+                # Add records
+                for record in records:
+                    row = [record.get(h, '') for h in headers]
+                    ws.append(row)
+
+                # Center-align all data cells
+                for row in ws.iter_rows(min_row=2, max_row=ws.max_row, min_col=1, max_col=len(headers)):
+                    for cell in row:
+                        cell.alignment = Alignment(horizontal="center", vertical="center")
+
+                # Add autofilter
+                ws.auto_filter.ref = ws.dimensions
+
         # Start TOTALS tab creation
-        wb.save(self.report_filepath)
-        time.sleep(1)
-
         headers = [title.value for title in RequestReportTotalTitles]
         column_headers = headers[:-2]
         ref_sources_headers = headers[-2:]
@@ -144,7 +177,6 @@ class ReportGenerator:
             cell = totals_ws.cell(row=row_idx, column=1)
             cell.font = self.bold_font
             cell.alignment = Alignment(horizontal="left", vertical="center")
-
             cell.fill = self.gray_fill
 
         ref_sources_headers_row = len(column_headers)+2
@@ -153,8 +185,10 @@ class ReportGenerator:
             cell = totals_ws.cell(row=ref_sources_headers_row, column=col_idx)
             cell.font = self.bold_font
             cell.alignment = Alignment(horizontal="center", vertical="center")
-
             cell.fill = self.gray_fill
 
+        # Remove the default empty sheet now that other sheets exist
+        if default_sheet in wb.worksheets and len(wb.worksheets) > 1:
+            wb.remove(default_sheet)
+
         wb.save(self.report_filepath)
-        time.sleep(1)

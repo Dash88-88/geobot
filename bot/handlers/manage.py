@@ -147,46 +147,61 @@ async def process_report_generation(message: types.Message, state: FSMContext = 
     report_generator = ReportGenerator()
 
     if not report_generator.is_running():
-        for bonus_request in bonus_requests_db:
-            bonus = BonusLogics.get_by_id(bonus_request.bonus_id)
-            user = UserLogics.get_by_id(bonus_request.user_id)
+        try:
+            sub_cache = {}
+            for bonus_request in bonus_requests_db:
+                bonus = BonusLogics.get_by_id(bonus_request.bonus_id)
+                user = UserLogics.get_by_id(bonus_request.user_id)
 
-            if not bonus or not user:
-                continue
+                if not bonus or not user:
+                    continue
 
-            user_subscribed = str(await UserLogics.is_subscriber(bot=bot, chat_id=user.chat_id, user=user))
-            country_name = user.country.name if user.country else "None"
+                if user.chat_id not in sub_cache:
+                    try:
+                        sub_cache[user.chat_id] = str(await UserLogics.is_subscriber(bot=bot, chat_id=user.chat_id, user=user))
+                    except Exception:
+                        sub_cache[user.chat_id] = "False"
+                user_subscribed = sub_cache[user.chat_id]
+                country_name = user.country.name if user.country else "None"
 
-            bonus_request_data = {
-                RequestReportTitles.request_created_at.value: bonus_request.created_at,
-                RequestReportTitles.user_created_at.value: user.created_at,
-                RequestReportTitles.request_status.value: bonus_request.status,
-                RequestReportTitles.tg_chat_id.value: user.chat_id,
-                RequestReportTitles.site_id.value: user.site_id,
-                RequestReportTitles.group.value: user.group,
-                RequestReportTitles.country.value: country_name,
-                RequestReportTitles.is_subscribed.value: user_subscribed,
-                RequestReportTitles.bonus_description.value: bonus.description,
-            }
-            bonus_requests_data.append(bonus_request_data)
+                bonus_request_data = {
+                    RequestReportTitles.request_created_at.value: bonus_request.created_at,
+                    RequestReportTitles.user_created_at.value: user.created_at,
+                    RequestReportTitles.request_status.value: bonus_request.status,
+                    RequestReportTitles.tg_chat_id.value: user.chat_id,
+                    RequestReportTitles.site_id.value: user.site_id,
+                    RequestReportTitles.group.value: user.group,
+                    RequestReportTitles.country.value: country_name,
+                    RequestReportTitles.is_subscribed.value: user_subscribed,
+                    RequestReportTitles.bonus_description.value: bonus.description,
+                }
+                bonus_requests_data.append(bonus_request_data)
 
-        report_generator.run_bonus_request_generation(bonus_requests_data, totals_user_data, top_referral_sources_data)
+            report_generator.run_bonus_request_generation(bonus_requests_data, totals_user_data, top_referral_sources_data)
 
-        with open(report_generator.report_filepath, "rb") as doc:
-            await bot.send_document(
-                chat_id=message.chat.id,
-                document=doc,
-                caption=f"📊 <b>Bonus Requests Report ({get_current_datetime().year})</b>",
+            with open(report_generator.report_filepath, "rb") as doc:
+                await bot.send_document(
+                    chat_id=message.chat.id,
+                    document=doc,
+                    caption=f"📊 <b>Bonus Requests Report ({get_current_datetime().year})</b>",
+                    parse_mode="HTML"
+                )
+
+            await message.answer(
+                text="✅ <b>The report was successfully generated and sent!</b> 📊",
+                reply_markup=manage_keyboard(),
                 parse_mode="HTML"
             )
-
-        await message.answer(
-            text="✅ <b>The report was successfully generated and sent!</b> 📊",
-            reply_markup=manage_keyboard(),
-            parse_mode="HTML"
-        )
-        await sleep(1)
-        report_generator.finish()
+        except Exception as e:
+            logging.exception(f"Error during report generation: {e}")
+            await message.answer(
+                text=f"❌ <b>Error during report generation:</b> {html.escape(str(e))}",
+                reply_markup=manage_keyboard(),
+                parse_mode="HTML"
+            )
+        finally:
+            await sleep(1)
+            report_generator.finish()
     else:
         await message.answer(text="⚠️ A report generation process is already in progress.",
                              reply_markup=manage_keyboard())
