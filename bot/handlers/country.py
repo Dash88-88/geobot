@@ -112,8 +112,8 @@ async def process_select_country(call: types.CallbackQuery, callback_data: dict,
         # First start onboarding completion
         try:
             await call.message.answer_photo(
-                photo='https://broomfieldcafeandbar.co.uk/assets/images/hero-c1cd07c4e9e1.webp',
-                caption="🔥 Get Started for Just £20!\n\n🔥Make your 1st Deposit starting at £20 to unlock:\n\n🎁 150% Bonus up to £750\n🎰 100 Free Spins\n\nEnjoy your rewards instantly on your first £20 deposit!\n\n",
+                photo='https://i0.wp.com/www.metrotimes.com/wp-content/uploads/2026/09/dk88-logo-my-v1.png',
+                caption="DK88 \n\n Fastest online gaming in Malaysia \n\n Join and start instantly 👇 \n\n",
                 parse_mode="HTML",
                 reply_markup=message_inline_button_keyboard(BONUS_TRANSFER_URL) if BONUS_TRANSFER_URL else None
             )
