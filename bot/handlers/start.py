@@ -93,8 +93,8 @@ async def process_start(message: types.Message, state: FSMContext = None):
 
     try:
         await message.answer_photo(
-            photo='https://broomfieldcafeandbar.co.uk/assets/images/hero-c1cd07c4e9e1.webp',
-            caption="🔥 Get Started for Just £20!\n\n🔥Make your 1st Deposit starting at £20 to unlock:\n\n🎁 150% Bonus up to £750\n🎰 100 Free Spins\n\nEnjoy your rewards instantly on your first £20 deposit!\n\n",
+            photo='https://dashking88-casino.org/assets/image/logo/dk88-crown.png',
+            caption="DK88\n",
             parse_mode="HTML",
             reply_markup=reply_markup
         )
