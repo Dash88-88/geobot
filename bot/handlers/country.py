@@ -113,7 +113,7 @@ async def process_select_country(call: types.CallbackQuery, callback_data: dict,
         try:
             await call.message.answer_photo(
                 photo='https://i.pinimg.com/736x/15/a8/58/15a85874421902ee0a4e12cc7eb50284.jpg',
-                caption="You're in! \n\n 🚀 Get ready for fast games, big wins, and personal rewards with DK88. Press OPEN to start the adventure\n",
+                caption="You're in! \n\n 🚀 Get ready for fast games, big wins, and personal rewards with DK88. Press GET BONUS to start the adventure🎁\n",
                 parse_mode="HTML",
                 reply_markup=message_inline_button_keyboard(BONUS_TRANSFER_URL) if BONUS_TRANSFER_URL else None
             )
