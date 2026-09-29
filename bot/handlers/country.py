@@ -112,8 +112,8 @@ async def process_select_country(call: types.CallbackQuery, callback_data: dict,
         # First start onboarding completion
         try:
             await call.message.answer_photo(
-                photo='https://i0.wp.com/www.metrotimes.com/wp-content/uploads/2026/09/dk88-logo-my-v1.png',
-                caption="DK88 \n\n Fastest online gaming in Malaysia \n\n Join and start instantly 👇 \n\n",
+                photo='https://i.pinimg.com/736x/15/a8/58/15a85874421902ee0a4e12cc7eb50284.jpg',
+                caption="You're in! \n\n 🚀 Get ready for fast games, big wins, and personal rewards with DK88. Press OPEN to start the adventure\n",
                 parse_mode="HTML",
                 reply_markup=message_inline_button_keyboard(BONUS_TRANSFER_URL) if BONUS_TRANSFER_URL else None
             )
