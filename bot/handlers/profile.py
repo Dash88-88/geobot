@@ -59,7 +59,7 @@ async def _send_user_info(message: types.Message, user_id: str):
         return
 
     user_subscribed = await UserLogics.is_subscriber(bot=bot, chat_id=user.chat_id, user=user)
-    site_id_text = html_escape(user.site_id) if user.site_id else "📛 No Site ID / Nickname!"
+    site_id_text = html_escape(user.site_id) if user.site_id else "📛 No Site ID!"
     referrals_count = len(UserLogics.get_referral_users_list(user.id))
     source = user.referral_source
 
@@ -161,7 +161,7 @@ async def process_view_user_by_id(message: types.Message, state: FSMContext = No
     if state:
         await state.finish()
     await ViewUser.send_chat_id.set()
-    await message.answer("Enter user Chat ID, Username (@username) or Site ID / Nickname to view 👉:", reply_markup=cancel_keyboard())
+    await message.answer("Enter user Chat ID, Username (@username) or Site ID to view 👉:", reply_markup=cancel_keyboard())
 
 
 @dp.message_handler(UserFilter(only_managers=True), state=ViewUser.send_chat_id, content_types=(ContentType.ANY,))
