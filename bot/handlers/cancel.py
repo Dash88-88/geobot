@@ -37,8 +37,8 @@ async def cancel_from_callback(update: types.Message or types.CallbackQuery, sta
             reg_link = f"\n\nDon't have an account yet? Register <a href='{REGISTRATION_URL}'>HERE</a>" if REGISTRATION_URL else ""
             target = update.message if isinstance(update, types.CallbackQuery) else update
             await target.answer(
-                f"⚠️ <b>Site ID / Nickname is required to continue.</b>\n"
-                f"Please enter your Site ID or Nickname 👉{reg_link}",
+                f"⚠️ <b>Site ID is required to continue.</b>\n"
+                f"Please enter your Site ID 👉{reg_link}",
                 parse_mode="HTML"
             )
             if isinstance(update, types.CallbackQuery):
