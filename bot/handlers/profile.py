@@ -402,7 +402,7 @@ async def process_open_profile(message: types.Message, state: FSMContext = None)
     await message.answer(
         f"🌟 <b>Profile:</b> {display_name}\n"
         f"💱 <b>Currency:</b> {country_name}\n"
-        f"🃏 <b>Site ID / Nickname:</b> {site_id_text}\n"
+        f"🃏 <b>Site ID:</b> {site_id_text}\n"
         f"📣 <b>Status:</b> {'✅ Subscribed' if user_subscribed else f'📛 Please subscribe to our {channel_str_link}'}",
         disable_web_page_preview=True,
         parse_mode="HTML",
@@ -416,7 +416,7 @@ async def process_user_request_update_site_id(call: types.CallbackQuery, state: 
         await state.finish()
     await UpdateSiteID.send_site_id.set()
     await call.message.answer(
-        "Enter your <b>Site ID</b> or <b>Nickname</b> on the platform 👉:",
+        "Enter your <b>Site ID</b> on the platform 👉:",
         reply_markup=cancel_keyboard(),
         parse_mode="HTML"
     )
