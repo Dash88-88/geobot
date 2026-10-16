@@ -451,7 +451,7 @@ async def process_confirm_update_site_id(message: types.Message, state: FSMConte
 
     if not site_id or len(site_id) > 100 or '\n' in site_id:
         await message.answer(
-            "⚠️ Invalid input. Please enter a valid Site ID or Nickname (single line, up to 100 characters):",
+            "⚠️ Invalid input. Please enter a valid Site ID (single line, up to 100 characters):",
             reply_markup=cancel_keyboard()
         )
         return
@@ -491,14 +491,14 @@ async def process_confirm_update_site_id(message: types.Message, state: FSMConte
         await message.answer(
             f"✅ <b>Registration complete!</b>\n"
             f"🌍 Country: <b>{country_name}</b>\n"
-            f"🃏 Site ID / Nickname: <b>{html_escape(site_id)}</b>\n\n"
+            f"🃏 Site ID: <b>{html_escape(site_id)}</b>\n\n"
             f"Welcome, {html_escape(message.from_user.first_name or (user.nickname if user else '') or 'friend')} 👋!",
             reply_markup=main_menu_keyboard(),
             parse_mode="HTML"
         )
     else:
         await message.answer(
-            f"✅ Your Site ID / Nickname has been updated to: <b>{html_escape(site_id)}</b>",
+            f"✅ Your Site ID has been updated to: <b>{html_escape(site_id)}</b>",
             reply_markup=main_menu_keyboard() if not (user and user.is_manager) else manage_keyboard(),
             parse_mode="HTML"
         )
@@ -506,5 +506,5 @@ async def process_confirm_update_site_id(message: types.Message, state: FSMConte
 
 @dp.message_handler(state=UpdateSiteID.send_site_id, content_types=ContentType.ANY)
 async def process_invalid_type_update_site_id(message: types.Message):
-    await message.answer("Please send text with your Site ID or Nickname 👉:", reply_markup=cancel_keyboard())
+    await message.answer("Please send text with your Site ID 👉:", reply_markup=cancel_keyboard())
 
