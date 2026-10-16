@@ -74,8 +74,8 @@ async def process_start(message: types.Message, state: FSMContext = None):
         reg_link = f"\n\nDon't have an account yet? Register <a href='{REGISTRATION_URL}'>HERE</a>" if REGISTRATION_URL else ""
         await message.answer(
             f"💱 Currency: <b>{country.name}</b>\n\n"
-            f"🃏 <b>Please enter your Site ID / Nickname:</b>\n"
-            f"<i>Without Site ID / Nickname, you will not be able to use the bot and request bonuses.</i>"
+            f"🃏 <b>Please enter your Site ID:</b>\n"
+            f"<i>Without Site ID, you will not be able to use the bot and request bonuses.</i>"
             f"{reg_link}",
             parse_mode="HTML"
         )
