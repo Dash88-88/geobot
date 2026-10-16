@@ -84,7 +84,7 @@ async def _send_bonus_request_info(user_id: str or int, bonus_request_id: str, b
             f"<b>📄 Bonus text:</b>\n{bonus.description}\n"
             f"<b>{user_group_icon[0]} User ID:</b> <code>{bonus_user.chat_id}</code>\n"
             f"<b>🌍 Country:</b> {country_display}\n"
-            f"<b>🃏 Site ID / Nickname:</b> {bonus_user.site_id if bonus_user.site_id else 'No site ID / nickname provided!'}\n"
+            f"<b>🃏 Site ID</b> {bonus_user.site_id if bonus_user.site_id else 'No site ID provided!'}\n"
             f"{subscribed_text}"
         )
     else:
@@ -488,7 +488,7 @@ async def process_request_bonus(call: types.CallbackQuery, callback_data: dict):
     if not user.site_id:
         reg_link = f"<a href='{REGISTRATION_URL}'>HERE</a>" if REGISTRATION_URL else "Registration"
         await call.message.answer(
-            f"Enter your Site ID or Nickname in {DefaultKeyboardButtons.Profile.value} from {reg_link} to request the Bonus",
+            f"Enter your Site ID in {DefaultKeyboardButtons.Profile.value} from {reg_link} to request the Bonus",
             reply_markup=main_menu_keyboard(),
             disable_web_page_preview=True,
             parse_mode="HTML"
