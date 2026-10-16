@@ -27,7 +27,7 @@ class BuiltInReferralSources(Enum):
 
 
 class DefaultInlineButtons(Enum):
-    ChangeSiteID = "✏️ Update Site ID / Nickname"
+    ChangeSiteID = "✏️ Update Site ID"
     # Bonus Logic
     RequestBonus = "📲 Request Bonus"
     BonusAlreadyRequested = "🚀 Bonus Requested"
@@ -123,19 +123,19 @@ class InlineQueryTypes(Enum):
 
 
 BonusRequestRejectReasonTitles = {
-    "inv_id": "Invalid Site ID / Nickname",
+    "inv_id": "Invalid Site ID ",
     "no_sub": "No subscription",
     "already_rec": "Already Received",
     "just_rej": "Just Reject"
 }
 
 BonusRequestRejectReasons = {
-    "inv_id": "Your profile Site ID / Nickname is not valid.",
+    "inv_id": "Your profile Site ID is not valid.",
     "no_sub": "You are not subscribed to our channel.",
     "already_rec": "This bonus has already been claimed by your account.",
     "just_rej": "Your request was rejected.",
-    "Invalid Site ID / Nickname": "Your profile Site ID / Nickname is not valid.",
-    "Invalid Site ID": "Your profile Site ID / Nickname is not valid.",
+    "Invalid Site ID": "Your profile Site ID is not valid.",
+    "Invalid Site ID": "Your profile Site ID is not valid.",
     "No subscription": "You are not subscribed to our channel.",
     "Already Received": "This bonus has already been claimed by your account.",
     "Just Reject": "Your request was rejected."
@@ -277,7 +277,7 @@ class RequestReportTitles(Enum):
     user_created_at = "USER CREATED"
     request_status = "REQUEST STATUS"
     tg_chat_id = "TG CHAT ID"
-    site_id = "SITE ID / NICKNAME"
+    site_id = "SITE ID"
     group = "GROUP"
     country = "CURRENCY"
     is_subscribed = "IS SUBSCRIBED"
